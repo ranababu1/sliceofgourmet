@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../recipes/providers.dart';
-import '../../../core/widgets/recipe_card.dart';
-import 'search_delegate.dart';
+import '../../../core/widgets/recipe_small_card.dart';
 import '../../recipes/data/recipe.dart';
+import 'search_delegate.dart';
 
 class RecipeListScreen extends ConsumerStatefulWidget {
   const RecipeListScreen({super.key});
@@ -36,9 +36,7 @@ class _RecipeListScreenState extends ConsumerState<RecipeListScreen> {
   }
 
   Future<void> _loadPage() async {
-    setState(() {
-      _loadingMore = true;
-    });
+    setState(() => _loadingMore = true);
     final result = await ref.read(latestRecipesProvider(_page).future);
     if (!mounted) return;
     setState(() {
@@ -52,6 +50,7 @@ class _RecipeListScreenState extends ConsumerState<RecipeListScreen> {
   @override
   Widget build(BuildContext context) {
     final bookmarks = ref.watch(bookmarksProvider);
+
     return RefreshIndicator(
       onRefresh: () async {
         setState(() {
@@ -86,7 +85,7 @@ class _RecipeListScreenState extends ConsumerState<RecipeListScreen> {
             sliver: SliverGrid.builder(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                childAspectRatio: .72,
+                childAspectRatio: .78,
               ),
               itemCount: recipes.length + (_loadingMore ? 2 : 0),
               itemBuilder: (context, index) {
@@ -100,12 +99,17 @@ class _RecipeListScreenState extends ConsumerState<RecipeListScreen> {
                 }
                 final r = recipes[index];
                 final isBookmarked = bookmarks.contains(r.id);
-                return RecipeCard(
-                  recipe: r,
-                  isBookmarked: isBookmarked,
-                  onBookmarkToggle: () => ref
-                      .read(bookmarkIdsNotifierProvider.notifier)
-                      .toggle(r.id),
+                return Padding(
+                  padding: const EdgeInsets.all(6.0),
+                  child: RecipeSmallCard(
+                    recipe: r,
+                    saved: isBookmarked,
+                    onToggleSave: () => ref
+                        .read(bookmarkIdsNotifierProvider.notifier)
+                        .toggle(r.id),
+                    height: 220,
+                    width: double.infinity,
+                  ),
                 );
               },
             ),

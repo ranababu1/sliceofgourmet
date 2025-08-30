@@ -1,8 +1,8 @@
 import 'recipe.dart';
 
-/// Contract for data source. First a mock, later a WordPress REST impl.
 abstract class RecipeRepository {
   Future<List<Recipe>> fetchLatest({int page = 1, int pageSize = 20});
+  Future<List<Recipe>> fetchTrending({int limit = 10});
   Future<Recipe> fetchById(String id);
   Future<List<String>> fetchCategories();
   Future<List<Recipe>> search(String query, {int page = 1, int pageSize = 20});
@@ -13,7 +13,7 @@ abstract class RecipeRepository {
   });
 }
 
-/// Simple in-memory mock data for UI bring-up.
+/// Mock repository remains useful for tests.
 class MockRecipeRepository implements RecipeRepository {
   final List<Recipe> _items = List.generate(24, (i) {
     final id = (i + 1).toString();
@@ -43,6 +43,12 @@ class MockRecipeRepository implements RecipeRepository {
         : (start + pageSize);
     if (start >= _items.length) return [];
     return _items.sublist(start, end);
+  }
+
+  @override
+  Future<List<Recipe>> fetchTrending({int limit = 10}) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    return _items.take(limit).toList();
   }
 
   @override

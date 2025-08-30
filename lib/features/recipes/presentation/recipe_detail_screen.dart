@@ -72,6 +72,8 @@ class RecipeDetailScreen extends ConsumerWidget {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
+              if (recipe.ingredients.isEmpty)
+                const Text('Ingredients will appear here'),
               ...recipe.ingredients.map(
                 (e) => ListTile(
                   dense: true,
@@ -86,6 +88,8 @@ class RecipeDetailScreen extends ConsumerWidget {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
+              if (recipe.instructions.isEmpty)
+                const Text('Instructions will appear here'),
               ...recipe.instructions.asMap().entries.map(
                 (e) => ListTile(
                   dense: true,

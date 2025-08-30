@@ -1,14 +1,31 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'data/recipe_repository.dart';
+import 'data/wordpress_repository.dart';
+import 'data/wordpress_api.dart';
 import 'data/recipe.dart';
+import '../../core/cache/local_store.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Swap this to the real WordPress repository later.
+// Swap baseUrl if you use a staging site
+const _baseUrl = 'https://sliceofgourmet.com';
+
+final _apiProvider = Provider<WordPressApi>((ref) => WordPressApi(_baseUrl));
+final _storeProvider = Provider<LocalStore>((ref) => LocalStore.instance);
+
 final recipeRepositoryProvider = Provider<RecipeRepository>((ref) {
-  return MockRecipeRepository();
+  return WordPressRecipeRepository(
+    ref.read(_apiProvider),
+    ref.read(_storeProvider),
+  );
 });
 
-/// Latest feed with pagination
+// Data providers
+final trendingRecipesProvider = FutureProvider<List<Recipe>>((ref) async {
+  final repo = ref.watch(recipeRepositoryProvider);
+  return repo.fetchTrending(limit: 10);
+});
+
 final latestRecipesProvider = FutureProvider.family<List<Recipe>, int>((
   ref,
   page,
@@ -31,8 +48,7 @@ final searchResultsProvider = FutureProvider.family<List<Recipe>, String>((
   return repo.search(query.trim());
 });
 
-/// Bookmarks controller made public so other files can import it.
-/// We expose both the Set<String> state and a helper toggle.
+// bookmarks
 final bookmarkIdsNotifierProvider =
     StateNotifierProvider<BookmarkIdsNotifier, Set<String>>((ref) {
       return BookmarkIdsNotifier();
@@ -62,7 +78,6 @@ class BookmarkIdsNotifier extends StateNotifier<Set<String>> {
   }
 }
 
-/// Read only view of bookmark ids, for convenience.
 final bookmarksProvider = Provider<Set<String>>(
   (ref) => ref.watch(bookmarkIdsNotifierProvider),
 );

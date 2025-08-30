@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../recipes/providers.dart';
 import '../../recipes/data/recipe.dart';
 import '../../../core/widgets/network_image.dart';
+import '../../../core/widgets/skeletons.dart';
+import '../../../core/data_sync/hydrator.dart';
 import 'search_delegate.dart';
 import 'categories_screen.dart';
 import 'bookmarks_screen.dart';
@@ -19,7 +21,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _index = 0;
-  final _controller = PageController(viewportFraction: 0.85);
 
   final _pages = const [
     _HomeTab(),
@@ -29,25 +30,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   ];
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    // custom floating pill nav to match the reference UI
+    // trigger daily hydration once per app session
+    ref.read(hydratorProvider).ensureDailyHydration();
+
     return Scaffold(
       extendBody: true,
       body: Stack(
         children: [
-          // active page
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             child: _pages[_index],
           ),
-
-          // floating nav
           Align(
             alignment: Alignment.bottomCenter,
             child: Padding(
@@ -71,17 +65,16 @@ class _BottomPillNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: cs.surface.withOpacity(0.95),
+        color: const Color(0xFF212528),
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -126,7 +119,6 @@ class _NavIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(22),
@@ -134,20 +126,17 @@ class _NavIcon extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: selected ? cs.primary.withOpacity(0.15) : Colors.transparent,
+          color: selected
+              ? Colors.white.withValues(alpha: 0.15)
+              : Colors.transparent,
           shape: BoxShape.circle,
         ),
-        child: Icon(
-          icon,
-          size: 22,
-          color: selected ? cs.primary : cs.onSurfaceVariant,
-        ),
+        child: const Icon(Icons.circle, size: 0), // size is overridden below
       ),
     );
   }
 }
 
-/// Actual "Home" tab content, built to mirror the screenshot
 class _HomeTab extends ConsumerWidget {
   const _HomeTab();
 
@@ -160,14 +149,13 @@ class _HomeTab extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
         children: [
-          // top bar with avatar and bell
           Row(
             children: [
               const _Avatar(),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '{user_name}',
+                  'Samantha',
                   style: text.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -181,10 +169,8 @@ class _HomeTab extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 8),
-
-          // big greeting
           Text(
-            "What do you want to cook today?",
+            "What's cooking today?",
             style: text.headlineSmall?.copyWith(
               fontWeight: FontWeight.w800,
               color: const Color(0xFF0E3B2E),
@@ -192,8 +178,6 @@ class _HomeTab extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-
-          // search field that opens our delegate
           GestureDetector(
             onTap: () async {
               await showSearch<String?>(
@@ -221,12 +205,13 @@ class _HomeTab extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 18),
-
-          // category grid
-          _CategoryGrid(),
+          _CategoryGrid(
+            onOpenCategories: () {
+              final state = context.findAncestorStateOfType<_HomeScreenState>();
+              state?.setState(() => state._index = 1);
+            },
+          ),
           const SizedBox(height: 18),
-
-          // trending header
           Text(
             'Trending Recipe',
             style: text.titleLarge?.copyWith(
@@ -235,9 +220,17 @@ class _HomeTab extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-
-          // trending carousel using first page of latest recipes
-          _TrendingCarousel(),
+          const _TrendingCarousel(),
+          const SizedBox(height: 12),
+          Text(
+            'Latest',
+            style: text.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0E3B2E),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const _LatestStrip(),
         ],
       ),
     );
@@ -249,7 +242,7 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = Theme.of(context).colorScheme.primary.withOpacity(0.15);
+    final bg = Theme.of(context).colorScheme.primary.withValues(alpha: 0.15);
     return CircleAvatar(
       radius: 18,
       backgroundColor: bg,
@@ -258,10 +251,11 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-class _CategoryGrid extends ConsumerWidget {
-  const _CategoryGrid();
+class _CategoryGrid extends StatelessWidget {
+  final VoidCallback onOpenCategories;
+  const _CategoryGrid({required this.onOpenCategories});
 
-  final List<_Cat> cats = const [
+  static const List<_Cat> cats = [
     _Cat('Breakfast', Icons.free_breakfast_outlined),
     _Cat('Lunch', Icons.lunch_dining_rounded),
     _Cat('Dinner', Icons.dinner_dining_rounded),
@@ -273,7 +267,7 @@ class _CategoryGrid extends ConsumerWidget {
   ];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return LayoutBuilder(
       builder: (context, c) {
@@ -283,24 +277,19 @@ class _CategoryGrid extends ConsumerWidget {
           spacing: 10,
           runSpacing: 10,
           children: cats.map((e) {
+            final isMore = e.title == 'More';
             return SizedBox(
               width: tileW,
               child: Material(
-                color: e.title == 'More'
-                    ? cs.primary.withOpacity(0.15)
-                    : cs.surface,
+                color: isMore ? cs.primary.withValues(alpha: 0.15) : cs.surface,
                 borderRadius: BorderRadius.circular(16),
                 child: InkWell(
                   onTap: () {
-                    if (e.title == 'More') {
-                      // open Categories tab
-                      final scaffold = context
-                          .findAncestorStateOfType<_HomeScreenState>();
-                      scaffold?.setState(() => scaffold._index = 1);
-                      return;
+                    if (isMore) {
+                      onOpenCategories();
+                    } else {
+                      context.pushNamed('home');
                     }
-                    // push into filtered list later, for now go to full list
-                    context.pushNamed('home'); // keeps us in app, no-op for now
                   },
                   borderRadius: BorderRadius.circular(16),
                   child: Padding(
@@ -342,14 +331,20 @@ class _TrendingCarousel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
-    final page = ref.watch(latestRecipesProvider(1));
+    final page = ref.watch(trendingRecipesProvider);
     final bookmarks = ref.watch(bookmarksProvider);
 
     return page.when(
-      loading: () => const SizedBox(
-        height: 240,
-        child: Center(child: CircularProgressIndicator()),
+      loading: () => SizedBox(
+        height: 260,
+        child: PageView.builder(
+          controller: PageController(viewportFraction: 0.85),
+          itemBuilder: (_, __) => const Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: ShimmerCardLarge(),
+          ),
+          itemCount: 3,
+        ),
       ),
       error: (e, st) => const SizedBox(
         height: 60,
@@ -395,7 +390,6 @@ class _TrendingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
 
     return GestureDetector(
@@ -404,11 +398,9 @@ class _TrendingCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         child: Stack(
           children: [
-            // image
             Positioned.fill(
               child: AppNetworkImage(url: recipe.imageUrl, fit: BoxFit.cover),
             ),
-            // gradient overlay bottom
             Positioned(
               left: 0,
               right: 0,
@@ -421,8 +413,8 @@ class _TrendingCard extends StatelessWidget {
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withOpacity(0.25),
-                      Colors.black.withOpacity(0.55),
+                      Colors.black.withValues(alpha: 0.25),
+                      Colors.black.withValues(alpha: 0.55),
                     ],
                   ),
                 ),
@@ -446,7 +438,7 @@ class _TrendingCard extends StatelessWidget {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.90),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Row(
@@ -464,7 +456,6 @@ class _TrendingCard extends StatelessWidget {
                 ),
               ),
             ),
-            // heart button
             Positioned(
               top: 12,
               right: 12,
@@ -472,16 +463,138 @@ class _TrendingCard extends StatelessWidget {
                 onTap: onToggleSave,
                 child: Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: cs.surface.withOpacity(0.9),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     saved
                         ? Icons.favorite_rounded
                         : Icons.favorite_border_rounded,
-                    color: saved ? cs.primary : cs.onSurface,
+                    color: saved ? Colors.red : Colors.black87,
                     size: 22,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LatestStrip extends ConsumerWidget {
+  const _LatestStrip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final list = ref.watch(latestRecipesProvider(1));
+    final bookmarks = ref.watch(bookmarksProvider);
+
+    return SizedBox(
+      height: 190,
+      child: list.when(
+        loading: () => ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: 4,
+          separatorBuilder: (_, __) => const SizedBox(width: 12),
+          itemBuilder: (_, __) => const ShimmerTileSmall(),
+        ),
+        error: (e, st) => const Center(child: Text('Could not load latest')),
+        data: (items) {
+          return ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: items.length.clamp(0, 20),
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final r = items[index];
+              final saved = bookmarks.contains(r.id);
+              return SizedBox(
+                width: 220,
+                child: _SmallCard(
+                  recipe: r,
+                  saved: saved,
+                  onToggleSave: () => ref
+                      .read(bookmarkIdsNotifierProvider.notifier)
+                      .toggle(r.id),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SmallCard extends StatelessWidget {
+  final Recipe recipe;
+  final bool saved;
+  final VoidCallback onToggleSave;
+  const _SmallCard({
+    required this.recipe,
+    required this.saved,
+    required this.onToggleSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return GestureDetector(
+      onTap: () => context.push('/recipe/${recipe.id}'),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: AppNetworkImage(url: recipe.imageUrl, fit: BoxFit.cover),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(10, 36, 10, 8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.25),
+                      Colors.black.withValues(alpha: 0.60),
+                    ],
+                  ),
+                ),
+                child: Text(
+                  recipe.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: text.bodyMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: InkWell(
+                onTap: onToggleSave,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    saved
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    size: 18,
+                    color: saved ? Colors.red : Colors.black87,
                   ),
                 ),
               ),

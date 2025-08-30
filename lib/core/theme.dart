@@ -11,7 +11,7 @@ final lightTheme = ThemeData(
     brightness: Brightness.light,
   ),
   useMaterial3: true,
-  scaffoldBackgroundColor: const Color(0xFFF4F7F8),
+  scaffoldBackgroundColor: const Color(0xFFF4F5F7),
   appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
   textTheme: const TextTheme(
     headlineSmall: TextStyle(letterSpacing: -0.3),

@@ -25,6 +25,6 @@ GoRouter createRouter() {
       ),
     ],
     errorBuilder: (context, state) =>
-        Scaffold(body: Center(child: Text('Oops, something went wrong'))),
+        const Scaffold(body: Center(child: Text('Oops, something went wrong'))),
   );
 }
