@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/sliceofgourmet.iml" filepath="$PROJECT_DIR$/sliceofgourmet.iml" />
+      <module fileurl="file://$PROJECT_DIR$/android/sliceofgourmet_android.iml" filepath="$PROJECT_DIR$/android/sliceofgourmet_android.iml" />
+    </modules>
+  </component>
+</project>
