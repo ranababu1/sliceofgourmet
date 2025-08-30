@@ -6,7 +6,6 @@ import '../../recipes/providers.dart';
 import '../../recipes/data/recipe.dart';
 import '../../../core/widgets/network_image.dart';
 import 'search_delegate.dart';
-import 'recipe_list_screen.dart';
 import 'categories_screen.dart';
 import 'bookmarks_screen.dart';
 import 'settings_screen.dart';
@@ -260,7 +259,7 @@ class _Avatar extends StatelessWidget {
 }
 
 class _CategoryGrid extends ConsumerWidget {
-  _CategoryGrid({super.key});
+  const _CategoryGrid();
 
   final List<_Cat> cats = const [
     _Cat('Breakfast', Icons.free_breakfast_outlined),

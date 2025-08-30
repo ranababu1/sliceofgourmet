@@ -21,7 +21,7 @@ class MockRecipeRepository implements RecipeRepository {
     final cat = cats[i % cats.length];
     return Recipe(
       id: id,
-      title: 'Delicious ${cat} Recipe $id',
+      title: 'Delicious $cat Recipe $id',
       excerpt:
           'A short teaser for ${cat.toLowerCase()} recipe $id, quick and tasty.',
       content:
