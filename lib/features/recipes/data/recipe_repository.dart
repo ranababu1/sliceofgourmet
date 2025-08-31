@@ -1,104 +1,73 @@
 import 'recipe.dart';
+import 'category.dart';
 
 abstract class RecipeRepository {
   Future<List<Recipe>> fetchLatest({int page = 1, int pageSize = 20});
   Future<List<Recipe>> fetchTrending({int limit = 10});
   Future<Recipe> fetchById(String id);
-  Future<List<String>> fetchCategories();
+  Future<List<RecipeCategory>> fetchCategories();
   Future<List<Recipe>> search(String query, {int page = 1, int pageSize = 20});
-  Future<List<Recipe>> fetchByCategory(
-    String category, {
-    int page = 1,
-    int pageSize = 20,
-  });
+  Future<List<Recipe>> fetchByCategory(int categoryId,
+      {int page = 1, int pageSize = 20});
 }
 
-/// Mock repository remains useful for tests.
+/// Simple in memory mock for tests and previews
 class MockRecipeRepository implements RecipeRepository {
-  final List<Recipe> _items = List.generate(24, (i) {
-    final id = (i + 1).toString();
-    final cats = ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'];
-    final cat = cats[i % cats.length];
-    return Recipe(
-      id: id,
-      title: 'Delicious $cat Recipe $id',
-      excerpt:
-          'A short teaser for ${cat.toLowerCase()} recipe $id, quick and tasty.',
-      content:
-          'Step by step details for recipe $id. Replace with WP content later.',
-      imageUrl: 'https://picsum.photos/seed/recipe_$id/800/500',
-      category: cat,
-      cookTimeMinutes: 10 + (i % 5) * 5,
-      ingredients: ['Ingredient A', 'Ingredient B', 'Ingredient C'],
-      instructions: ['Prep ingredients', 'Cook properly', 'Serve hot'],
-    );
-  });
+  final List<Recipe> _items = List.generate(
+    10,
+    (i) => Recipe(
+      id: '$i',
+      title: 'Sample Recipe $i',
+      excerpt: 'Tasty sample $i',
+      content: '<p>Mock content</p>',
+      imageUrl: 'https://picsum.photos/seed/mock$i/800/600',
+      category: i.isEven ? 'Dinner' : 'Lunch',
+      cookTimeMinutes: 20 + i,
+      ingredients: const ['1 cup flour', '2 eggs', 'Salt to taste'],
+      instructions: const ['Mix ingredients', 'Cook until done', 'Serve hot'],
+    ),
+  );
+
+  final List<RecipeCategory> _cats = const [
+    RecipeCategory(id: 1, name: 'Breakfast', count: 12),
+    RecipeCategory(id: 2, name: 'Lunch', count: 20),
+    RecipeCategory(id: 3, name: 'Dinner', count: 34),
+    RecipeCategory(id: 4, name: 'Dessert', count: 18),
+    RecipeCategory(id: 5, name: 'Snacks', count: 9),
+  ];
+
+  @override
+  Future<Recipe> fetchById(String id) async {
+    return _items.firstWhere((e) => e.id == id, orElse: () => _items.first);
+  }
 
   @override
   Future<List<Recipe>> fetchLatest({int page = 1, int pageSize = 20}) async {
-    await Future.delayed(const Duration(milliseconds: 250));
-    final start = (page - 1) * pageSize;
-    final end = (start + pageSize) > _items.length
-        ? _items.length
-        : (start + pageSize);
-    if (start >= _items.length) return [];
-    return _items.sublist(start, end);
+    return _items;
   }
 
   @override
   Future<List<Recipe>> fetchTrending({int limit = 10}) async {
-    await Future.delayed(const Duration(milliseconds: 200));
     return _items.take(limit).toList();
   }
 
   @override
-  Future<Recipe> fetchById(String id) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    return _items.firstWhere((e) => e.id == id);
+  Future<List<RecipeCategory>> fetchCategories() async {
+    return _cats..sort((a, b) => b.count.compareTo(a.count));
   }
 
   @override
-  Future<List<String>> fetchCategories() async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    return ['Breakfast', 'Lunch', 'Dinner', 'Dessert', 'Snacks'];
-  }
-
-  @override
-  Future<List<Recipe>> search(
-    String query, {
-    int page = 1,
-    int pageSize = 20,
-  }) async {
-    await Future.delayed(const Duration(milliseconds: 250));
+  Future<List<Recipe>> search(String query,
+      {int page = 1, int pageSize = 20}) async {
     final q = query.toLowerCase();
-    final filtered = _items
-        .where(
-          (e) =>
-              e.title.toLowerCase().contains(q) ||
-              (e.category ?? '').toLowerCase().contains(q),
-        )
-        .toList();
-    final start = (page - 1) * pageSize;
-    final end = (start + pageSize) > filtered.length
-        ? filtered.length
-        : (start + pageSize);
-    if (start >= filtered.length) return [];
-    return filtered.sublist(start, end);
+    return _items.where((e) => e.title.toLowerCase().contains(q)).toList();
   }
 
   @override
-  Future<List<Recipe>> fetchByCategory(
-    String category, {
-    int page = 1,
-    int pageSize = 20,
-  }) async {
-    await Future.delayed(const Duration(milliseconds: 250));
-    final filtered = _items.where((e) => e.category == category).toList();
-    final start = (page - 1) * pageSize;
-    final end = (start + pageSize) > filtered.length
-        ? filtered.length
-        : (start + pageSize);
-    if (start >= filtered.length) return [];
-    return filtered.sublist(start, end);
+  Future<List<Recipe>> fetchByCategory(int categoryId,
+      {int page = 1, int pageSize = 20}) async {
+    // mock maps odd ids to Lunch, even to Dinner
+    final name = categoryId.isEven ? 'Dinner' : 'Lunch';
+    return _items.where((e) => e.category == name).toList();
   }
 }

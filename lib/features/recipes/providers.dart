@@ -3,11 +3,10 @@ import 'data/recipe_repository.dart';
 import 'data/wordpress_repository.dart';
 import 'data/wordpress_api.dart';
 import 'data/recipe.dart';
+import 'data/category.dart';
 import '../../core/cache/local_store.dart';
-
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Swap baseUrl if you use a staging site
 const _baseUrl = 'https://sliceofgourmet.com';
 
 final _apiProvider = Provider<WordPressApi>((ref) => WordPressApi(_baseUrl));
@@ -15,44 +14,52 @@ final _storeProvider = Provider<LocalStore>((ref) => LocalStore.instance);
 
 final recipeRepositoryProvider = Provider<RecipeRepository>((ref) {
   return WordPressRecipeRepository(
-    ref.read(_apiProvider),
-    ref.read(_storeProvider),
-  );
+      ref.read(_apiProvider), ref.read(_storeProvider));
 });
 
-// Data providers
+/// detail provider, fixes "recipeByIdProvider isn't defined"
+final recipeByIdProvider =
+    FutureProvider.family<Recipe, String>((ref, id) async {
+  final repo = ref.watch(recipeRepositoryProvider);
+  return repo.fetchById(id);
+});
+
 final trendingRecipesProvider = FutureProvider<List<Recipe>>((ref) async {
   final repo = ref.watch(recipeRepositoryProvider);
   return repo.fetchTrending(limit: 10);
 });
 
-final latestRecipesProvider = FutureProvider.family<List<Recipe>, int>((
-  ref,
-  page,
-) async {
+final latestRecipesProvider =
+    FutureProvider.family<List<Recipe>, int>((ref, page) async {
   final repo = ref.watch(recipeRepositoryProvider);
   return repo.fetchLatest(page: page, pageSize: 20);
 });
 
-final categoriesProvider = FutureProvider<List<String>>((ref) async {
+final categoriesProvider = FutureProvider<List<RecipeCategory>>((ref) async {
   final repo = ref.watch(recipeRepositoryProvider);
-  return repo.fetchCategories();
+  final all = await repo.fetchCategories();
+  all.sort((a, b) => b.count.compareTo(a.count));
+  return all;
 });
 
-final searchResultsProvider = FutureProvider.family<List<Recipe>, String>((
-  ref,
-  query,
-) async {
+final topCategoriesProvider = FutureProvider<List<RecipeCategory>>((ref) async {
+  final list = await ref.watch(categoriesProvider.future);
+  return list.take(5).toList(growable: false);
+});
+
+final searchResultsProvider =
+    FutureProvider.family<List<Recipe>, String>((ref, query) async {
   final repo = ref.watch(recipeRepositoryProvider);
-  if (query.trim().isEmpty) return [];
-  return repo.search(query.trim());
+  final q = query.trim();
+  if (q.isEmpty) return [];
+  return repo.search(q);
 });
 
 // bookmarks
 final bookmarkIdsNotifierProvider =
     StateNotifierProvider<BookmarkIdsNotifier, Set<String>>((ref) {
-      return BookmarkIdsNotifier();
-    });
+  return BookmarkIdsNotifier();
+});
 
 class BookmarkIdsNotifier extends StateNotifier<Set<String>> {
   BookmarkIdsNotifier() : super({}) {
@@ -78,9 +85,8 @@ class BookmarkIdsNotifier extends StateNotifier<Set<String>> {
   }
 }
 
-final bookmarksProvider = Provider<Set<String>>(
-  (ref) => ref.watch(bookmarkIdsNotifierProvider),
-);
+final bookmarksProvider =
+    Provider<Set<String>>((ref) => ref.watch(bookmarkIdsNotifierProvider));
 
 final bookmarkedRecipesProvider = FutureProvider<List<Recipe>>((ref) async {
   final repo = ref.watch(recipeRepositoryProvider);

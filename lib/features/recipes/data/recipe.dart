@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'package:html/parser.dart' as html_parser;
+import 'package:html/dom.dart' as dom;
 
 class Recipe {
   final String id;
   final String title;
   final String excerpt;
-  final String content; // can be HTML
+  final String content; // HTML
   final String imageUrl;
   final String? category;
   final int cookTimeMinutes;
@@ -24,33 +26,32 @@ class Recipe {
   });
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'title': title,
-    'excerpt': excerpt,
-    'content': content,
-    'imageUrl': imageUrl,
-    'category': category,
-    'cookTimeMinutes': cookTimeMinutes,
-    'ingredients': ingredients,
-    'instructions': instructions,
-  };
+        'id': id,
+        'title': title,
+        'excerpt': excerpt,
+        'content': content,
+        'imageUrl': imageUrl,
+        'category': category,
+        'cookTimeMinutes': cookTimeMinutes,
+        'ingredients': ingredients,
+        'instructions': instructions,
+      };
 
-  static Recipe fromJson(Map<String, dynamic> json) {
-    return Recipe(
-      id: '${json['id']}',
-      title: (json['title'] ?? '') as String,
-      excerpt: (json['excerpt'] ?? '') as String,
-      content: (json['content'] ?? '') as String,
-      imageUrl: (json['imageUrl'] ?? '') as String,
-      category: json['category'] == null ? null : json['category'] as String,
-      cookTimeMinutes: (json['cookTimeMinutes'] ?? 0) as int,
-      ingredients:
-          (json['ingredients'] as List?)?.map((e) => '$e').toList() ?? const [],
-      instructions:
-          (json['instructions'] as List?)?.map((e) => '$e').toList() ??
-          const [],
-    );
-  }
+  static Recipe fromJson(Map<String, dynamic> json) => Recipe(
+        id: '${json['id']}',
+        title: (json['title'] ?? '') as String,
+        excerpt: (json['excerpt'] ?? '') as String,
+        content: (json['content'] ?? '') as String,
+        imageUrl: (json['imageUrl'] ?? '') as String,
+        category: json['category'] == null ? null : json['category'] as String,
+        cookTimeMinutes: (json['cookTimeMinutes'] ?? 0) as int,
+        ingredients:
+            (json['ingredients'] as List?)?.map((e) => '$e').toList() ??
+                const [],
+        instructions:
+            (json['instructions'] as List?)?.map((e) => '$e').toList() ??
+                const [],
+      );
 
   static String _stripHtml(String html) {
     return html
@@ -58,6 +59,40 @@ class Recipe {
         .replaceAll('&nbsp;', ' ')
         .replaceAll('&amp;', '&')
         .trim();
+  }
+
+  static List<String> _extractBySelectors(
+      dom.Document doc, List<String> selectors) {
+    for (final sel in selectors) {
+      final nodes = doc.querySelectorAll(sel);
+      if (nodes.isNotEmpty) {
+        return nodes
+            .map((e) => e.text.trim())
+            .where((t) => t.isNotEmpty)
+            .toList();
+      }
+    }
+    return const [];
+  }
+
+  static int _extractCookTime(dom.Document doc) {
+    final candidates = <String>[
+      '.wprm-recipe-total_time',
+      '.wprm-recipe-cook_time',
+      '[itemprop="totalTime"]',
+      '[itemprop="cookTime"]',
+    ];
+    for (final sel in candidates) {
+      final el = doc.querySelector(sel);
+      if (el != null) {
+        final text = el.text.toLowerCase().replaceAll(RegExp(r'[^0-9]'), '');
+        if (text.isNotEmpty) {
+          final n = int.tryParse(text);
+          if (n != null && n > 0) return n;
+        }
+      }
+    }
+    return 20;
   }
 
   /// Build from WordPress post json with `_embed=1`
@@ -92,6 +127,27 @@ class Recipe {
     final excerptHtml = j['excerpt']?['rendered']?.toString() ?? '';
     final contentHtml = j['content']?['rendered']?.toString() ?? '';
 
+    final doc = html_parser.parse(contentHtml);
+
+    final ingredients = _extractBySelectors(doc, <String>[
+      '.wprm-recipe-ingredients-container .wprm-recipe-ingredient',
+      '.wprm-recipe-ingredients .wprm-recipe-ingredient',
+      '.wprm-recipe-ingredient',
+      '.recipe-ingredients li',
+      'ul.ingredients li',
+    ]);
+
+    final instructions = _extractBySelectors(doc, <String>[
+      '.wprm-recipe-instructions-container .wprm-recipe-instruction',
+      '.wprm-recipe-instructions .wprm-recipe-instruction',
+      '.wprm-recipe-instruction',
+      '.recipe-instructions li',
+      'ol.instructions li',
+      'ol li',
+    ]);
+
+    final cookMins = _extractCookTime(doc);
+
     return Recipe(
       id: '${j['id']}',
       title: _stripHtml(title),
@@ -99,11 +155,9 @@ class Recipe {
       content: contentHtml,
       imageUrl: image,
       category: catName,
-      // if you add ACF for cook time later, map it here
-      cookTimeMinutes: 20,
-      // if you store ingredients and steps in ACF, map them later
-      ingredients: const [],
-      instructions: const [],
+      cookTimeMinutes: cookMins,
+      ingredients: ingredients,
+      instructions: instructions,
     );
   }
 

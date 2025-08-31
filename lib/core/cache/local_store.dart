@@ -5,7 +5,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 /// Boxes:
 /// - posts: each entry is a Recipe json, key `post_<id>`
 /// - lists: stores lists of ids, example `latest_page_1` => [1,2,3]
-/// - meta:  lastHydratedAt (ISO), trending_ids, categories_names
+/// - meta: lastHydratedAt (ISO), trending_ids, categories_data
 class LocalStore {
   static late Box _posts;
   static late Box _lists;
@@ -42,7 +42,7 @@ class LocalStore {
     await _lists.put(key, ids);
   }
 
-  // meta
+  // meta basics
   DateTime? get lastHydratedAt {
     final s = _meta.get('lastHydratedAt');
     if (s is String) return DateTime.tryParse(s);
@@ -53,6 +53,7 @@ class LocalStore {
     await _meta.put('lastHydratedAt', dt.toIso8601String());
   }
 
+  // trending and latest ids
   List<String>? get trendingIds => readIdList('trending_ids');
   Future<void> setTrendingIds(List<String> ids) =>
       writeIdList('trending_ids', ids);
@@ -61,13 +62,17 @@ class LocalStore {
   Future<void> setLatestPage1Ids(List<String> ids) =>
       writeIdList('latest_page_1', ids);
 
-  List<String>? getCategoryNames() {
-    final raw = _meta.get('categories_names');
-    if (raw is List) return raw.map((e) => '$e').toList();
+  // categories list cache as JSON
+  List<Map<String, dynamic>>? readCategories() {
+    final raw = _meta.get('categories_json');
+    if (raw is String) {
+      final list = jsonDecode(raw) as List;
+      return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
     return null;
   }
 
-  Future<void> setCategoryNames(List<String> names) async {
-    await _meta.put('categories_names', names);
+  Future<void> writeCategories(List<Map<String, dynamic>> categories) async {
+    await _meta.put('categories_json', jsonEncode(categories));
   }
 }

@@ -9,36 +9,59 @@ class CategoriesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncCats = ref.watch(categoriesProvider);
-    return asyncCats.when(
-      data: (cats) {
-        return ListView(
-          padding: const EdgeInsets.all(12),
-          children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8.0),
-              child: Text(
-                'Browse by Category',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-              ),
-            ),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: cats.map((c) {
-                return ActionChip(
-                  label: Text(c),
-                  avatar: const Icon(Icons.category),
-                  onPressed: () => context.push(
-                    '/?category=$c',
-                  ), // hint route, we keep simple for now
-                );
-              }).toList(),
-            ),
-          ],
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, st) => Center(child: Text('Could not load categories')),
+    final cs = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Categories')),
+      body: asyncCats.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, st) =>
+            const Center(child: Text('Could not load categories')),
+        data: (cats) {
+          return GridView.builder(
+            padding: const EdgeInsets.all(12),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                childAspectRatio: 1.05,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10),
+            itemCount: cats.length,
+            itemBuilder: (_, i) {
+              final c = cats[i];
+              return Material(
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => context.push(
+                      '/category/${c.id}?name=${Uri.encodeComponent(c.name)}'),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.restaurant_menu_rounded,
+                            color: Color(0xFF2F855A)),
+                        const SizedBox(height: 8),
+                        Text(c.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 2),
+                        Text('${c.count} recipes',
+                            style: TextStyle(
+                                fontSize: 11, color: cs.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

@@ -72,7 +72,7 @@ class _RecipeListScreenState extends ConsumerState<RecipeListScreen> {
                 onPressed: () async {
                   await showSearch<String?>(
                     context: context,
-                    delegate: RecipeSearchDelegate(ref),
+                    delegate: RecipeSearchDelegate(),
                   );
                 },
                 icon: const Icon(Icons.search),

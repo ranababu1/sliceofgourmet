@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers.dart';
-import '../data/recipe.dart';
 import '../../../core/widgets/network_image.dart';
 
 class RecipeDetailScreen extends ConsumerWidget {
@@ -10,20 +9,20 @@ class RecipeDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final repo = ref.watch(recipeRepositoryProvider);
-    return FutureBuilder<Recipe>(
-      future: repo.fetchById(recipeId),
-      builder: (context, snap) {
-        if (!snap.hasData) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('Recipe')),
-            body: const Center(child: CircularProgressIndicator()),
-          );
-        }
-        final recipe = snap.data!;
-        final bookmarks = ref.watch(bookmarksProvider);
-        final isBookmarked = bookmarks.contains(recipe.id);
+    final asyncRecipe = ref.watch(recipeByIdProvider(recipeId));
+    final bookmarks = ref.watch(bookmarksProvider);
 
+    return asyncRecipe.when(
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('Recipe')),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, st) => Scaffold(
+        appBar: AppBar(title: const Text('Recipe')),
+        body: const Center(child: Text('Could not load recipe')),
+      ),
+      data: (recipe) {
+        final isBookmarked = bookmarks.contains(recipe.id);
         return Scaffold(
           appBar: AppBar(
             title: Text(recipe.title),
@@ -33,8 +32,7 @@ class RecipeDetailScreen extends ConsumerWidget {
                     .read(bookmarkIdsNotifierProvider.notifier)
                     .toggle(recipe.id),
                 icon: Icon(
-                  isBookmarked ? Icons.bookmark : Icons.bookmark_outline,
-                ),
+                    isBookmarked ? Icons.bookmark : Icons.bookmark_outline),
                 tooltip: isBookmarked ? 'Remove bookmark' : 'Add bookmark',
               ),
             ],
@@ -42,11 +40,13 @@ class RecipeDetailScreen extends ConsumerWidget {
           body: ListView(
             padding: const EdgeInsets.all(12),
             children: [
-              AppNetworkImage(
-                url: recipe.imageUrl,
-                height: 220,
-                width: double.infinity,
-              ),
+              if (recipe.imageUrl.isNotEmpty)
+                AppNetworkImage(
+                  url: recipe.imageUrl,
+                  height: 220,
+                  width: double.infinity,
+                  borderRadius: BorderRadius.circular(18),
+                ),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -62,18 +62,15 @@ class RecipeDetailScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              Text(
-                recipe.excerpt,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
+              if (recipe.excerpt.isNotEmpty)
+                Text(recipe.excerpt,
+                    style: Theme.of(context).textTheme.bodyLarge),
               const SizedBox(height: 16),
-              Text(
-                'Ingredients',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+              Text('Ingredients',
+                  style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               if (recipe.ingredients.isEmpty)
-                const Text('Ingredients will appear here'),
+                const Text('Ingredients not provided yet'),
               ...recipe.ingredients.map(
                 (e) => ListTile(
                   dense: true,
@@ -83,27 +80,23 @@ class RecipeDetailScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Text(
-                'Instructions',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+              Text('Instructions',
+                  style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               if (recipe.instructions.isEmpty)
-                const Text('Instructions will appear here'),
+                const Text('Instructions not provided yet'),
               ...recipe.instructions.asMap().entries.map(
-                (e) => ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    radius: 12,
-                    child: Text(
-                      '${e.key + 1}',
-                      style: const TextStyle(fontSize: 12),
+                    (e) => ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: CircleAvatar(
+                        radius: 12,
+                        child: Text('${e.key + 1}',
+                            style: const TextStyle(fontSize: 12)),
+                      ),
+                      title: Text(e.value),
                     ),
                   ),
-                  title: Text(e.value),
-                ),
-              ),
               const SizedBox(height: 24),
             ],
           ),

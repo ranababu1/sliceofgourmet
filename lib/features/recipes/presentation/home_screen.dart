@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../recipes/providers.dart';
 import '../../recipes/data/recipe.dart';
+import '../../recipes/data/category.dart';
 import '../../../core/widgets/network_image.dart';
 import '../../../core/widgets/skeletons.dart';
 import '../../../core/data_sync/hydrator.dart';
@@ -31,7 +32,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // trigger daily hydration once per app session
     ref.read(hydratorProvider).ensureDailyHydration();
 
     return Scaffold(
@@ -39,17 +39,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: Stack(
         children: [
           AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: _pages[_index],
-          ),
+              duration: const Duration(milliseconds: 250),
+              child: _pages[_index]),
           Align(
             alignment: Alignment.bottomCenter,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
               child: _BottomPillNav(
-                index: _index,
-                onChanged: (i) => setState(() => _index = i),
-              ),
+                  index: _index, onChanged: (i) => setState(() => _index = i)),
             ),
           ),
         ],
@@ -72,35 +69,30 @@ class _BottomPillNav extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 18,
+              offset: const Offset(0, 8)),
         ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _NavIcon(
-            selected: index == 0,
-            icon: Icons.home_rounded,
-            onTap: () => onChanged(0),
-          ),
+              selected: index == 0,
+              icon: Icons.home_rounded,
+              onTap: () => onChanged(0)),
           _NavIcon(
-            selected: index == 1,
-            icon: Icons.grid_view_rounded,
-            onTap: () => onChanged(1),
-          ),
+              selected: index == 1,
+              icon: Icons.grid_view_rounded,
+              onTap: () => onChanged(1)),
           _NavIcon(
-            selected: index == 2,
-            icon: Icons.favorite_rounded,
-            onTap: () => onChanged(2),
-          ),
+              selected: index == 2,
+              icon: Icons.favorite_rounded,
+              onTap: () => onChanged(2)),
           _NavIcon(
-            selected: index == 3,
-            icon: Icons.settings_rounded,
-            onTap: () => onChanged(3),
-          ),
+              selected: index == 3,
+              icon: Icons.settings_rounded,
+              onTap: () => onChanged(3)),
         ],
       ),
     );
@@ -111,11 +103,8 @@ class _NavIcon extends StatelessWidget {
   final bool selected;
   final IconData icon;
   final VoidCallback onTap;
-  const _NavIcon({
-    required this.selected,
-    required this.icon,
-    required this.onTap,
-  });
+  const _NavIcon(
+      {required this.selected, required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -131,7 +120,7 @@ class _NavIcon extends StatelessWidget {
               : Colors.transparent,
           shape: BoxShape.circle,
         ),
-        child: const Icon(Icons.circle, size: 0), // size is overridden below
+        child: Icon(icon, size: 22, color: Colors.white),
       ),
     );
   }
@@ -154,13 +143,9 @@ class _HomeTab extends ConsumerWidget {
               const _Avatar(),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  'Samantha',
-                  style: text.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
+                  child: Text('{user_name}',
+                      style: text.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700))),
               IconButton(
                 icon: const Icon(Icons.notifications_none_rounded),
                 onPressed: () {},
@@ -169,20 +154,17 @@ class _HomeTab extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            "What's cooking today?",
-            style: text.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0E3B2E),
-              height: 1.2,
-            ),
-          ),
+          Text("What are you cooking today?",
+              style: text.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0E3B2E),
+                  height: 1.2)),
           const SizedBox(height: 16),
           GestureDetector(
             onTap: () async {
               await showSearch<String?>(
                 context: context,
-                delegate: RecipeSearchDelegate(ref),
+                delegate: RecipeSearchDelegate(),
               );
             },
             child: AbsorbPointer(
@@ -192,43 +174,27 @@ class _HomeTab extends ConsumerWidget {
                   prefixIcon: const Icon(Icons.search_rounded),
                   filled: true,
                   fillColor: cs.surfaceContainerHighest,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none),
                 ),
               ),
             ),
           ),
           const SizedBox(height: 18),
-          _CategoryGrid(
-            onOpenCategories: () {
-              final state = context.findAncestorStateOfType<_HomeScreenState>();
-              state?.setState(() => state._index = 1);
-            },
-          ),
+          _TopCategoriesGrid(),
           const SizedBox(height: 18),
-          Text(
-            'Trending Recipe',
-            style: text.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0E3B2E),
-            ),
-          ),
+          Text('Trending Recipe',
+              style: text.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800, color: const Color(0xFF0E3B2E))),
           const SizedBox(height: 12),
           const _TrendingCarousel(),
           const SizedBox(height: 12),
-          Text(
-            'Latest',
-            style: text.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0E3B2E),
-            ),
-          ),
+          Text('Latest',
+              style: text.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800, color: const Color(0xFF0E3B2E))),
           const SizedBox(height: 12),
           const _LatestStrip(),
         ],
@@ -244,86 +210,110 @@ class _Avatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final bg = Theme.of(context).colorScheme.primary.withValues(alpha: 0.15);
     return CircleAvatar(
-      radius: 18,
-      backgroundColor: bg,
-      child: const Text('S', style: TextStyle(fontWeight: FontWeight.w700)),
-    );
+        radius: 18,
+        backgroundColor: bg,
+        child: const Text('S', style: TextStyle(fontWeight: FontWeight.w700)));
   }
 }
 
-class _CategoryGrid extends StatelessWidget {
-  final VoidCallback onOpenCategories;
-  const _CategoryGrid({required this.onOpenCategories});
-
-  static const List<_Cat> cats = [
-    _Cat('Breakfast', Icons.free_breakfast_outlined),
-    _Cat('Lunch', Icons.lunch_dining_rounded),
-    _Cat('Dinner', Icons.dinner_dining_rounded),
-    _Cat('Snack', Icons.emoji_food_beverage_outlined),
-    _Cat('Cuisine', Icons.restaurant_menu_rounded),
-    _Cat('Smoothies', Icons.blender_outlined),
-    _Cat('Dessert', Icons.icecream_outlined),
-    _Cat('More', Icons.grid_view_rounded),
-  ];
-
+class _TopCategoriesGrid extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncTop = ref.watch(topCategoriesProvider);
     final cs = Theme.of(context).colorScheme;
-    return LayoutBuilder(
-      builder: (context, c) {
-        final width = c.maxWidth;
-        final tileW = (width - 3 * 10) / 4;
-        return Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: cats.map((e) {
-            final isMore = e.title == 'More';
-            return SizedBox(
-              width: tileW,
-              child: Material(
-                color: isMore ? cs.primary.withValues(alpha: 0.15) : cs.surface,
-                borderRadius: BorderRadius.circular(16),
-                child: InkWell(
-                  onTap: () {
-                    if (isMore) {
-                      onOpenCategories();
-                    } else {
-                      context.pushNamed('home');
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(16),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 14,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(e.icon, color: const Color(0xFF2F855A)),
-                        const SizedBox(height: 8),
-                        Text(
-                          e.title,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
+
+    return asyncTop.when(
+      loading: () => GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            childAspectRatio: 1.05,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10),
+        itemCount: 6,
+        itemBuilder: (_, __) => Container(
+          decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(18)),
+        ),
+      ),
+      error: (e, st) => const SizedBox.shrink(),
+      data: (top) {
+        final tiles = <Widget>[];
+        for (final c in top) {
+          tiles.add(_CategoryTile(category: c));
+        }
+        tiles.add(_MoreCategoriesTile());
+        return GridView.count(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          crossAxisCount: 3,
+          childAspectRatio: 1.05,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          children: tiles,
         );
       },
     );
   }
 }
 
-class _Cat {
-  final String title;
-  final IconData icon;
-  const _Cat(this.title, this.icon);
+class _CategoryTile extends StatelessWidget {
+  final RecipeCategory category;
+  const _CategoryTile({required this.category});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: cs.surface,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => context.push(
+            '/category/${category.id}?name=${Uri.encodeComponent(category.name)}'),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.restaurant_menu_rounded,
+                  color: Color(0xFF2F855A)),
+              const SizedBox(height: 8),
+              Text(category.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 2),
+              Text('${category.count} recipes',
+                  style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MoreCategoriesTile extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: cs.primary.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => context.push('/categories'),
+        child: const Center(
+          child: Text('More',
+              style: TextStyle(
+                  fontWeight: FontWeight.w700, color: Color(0xFF2F855A))),
+        ),
+      ),
+    );
+  }
 }
 
 class _TrendingCarousel extends ConsumerWidget {
@@ -340,16 +330,12 @@ class _TrendingCarousel extends ConsumerWidget {
         child: PageView.builder(
           controller: PageController(viewportFraction: 0.85),
           itemBuilder: (_, __) => const Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: ShimmerCardLarge(),
-          ),
+              padding: EdgeInsets.only(right: 12), child: ShimmerCardLarge()),
           itemCount: 3,
         ),
       ),
       error: (e, st) => const SizedBox(
-        height: 60,
-        child: Center(child: Text('Could not load trending')),
-      ),
+          height: 60, child: Center(child: Text('Could not load trending'))),
       data: (items) {
         return SizedBox(
           height: 260,
@@ -382,11 +368,8 @@ class _TrendingCard extends StatelessWidget {
   final bool saved;
   final VoidCallback onToggleSave;
 
-  const _TrendingCard({
-    required this.recipe,
-    required this.saved,
-    required this.onToggleSave,
-  });
+  const _TrendingCard(
+      {required this.recipe, required this.saved, required this.onToggleSave});
 
   @override
   Widget build(BuildContext context) {
@@ -395,12 +378,12 @@ class _TrendingCard extends StatelessWidget {
     return GestureDetector(
       onTap: () => context.push('/recipe/${recipe.id}'),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
         child: Stack(
           children: [
             Positioned.fill(
-              child: AppNetworkImage(url: recipe.imageUrl, fit: BoxFit.cover),
-            ),
+                child:
+                    AppNetworkImage(url: recipe.imageUrl, fit: BoxFit.cover)),
             Positioned(
               left: 0,
               right: 0,
@@ -409,14 +392,13 @@ class _TrendingCard extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(14, 40, 14, 12),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.25),
-                      Colors.black.withValues(alpha: 0.55),
-                    ],
-                  ),
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.25),
+                        Colors.black.withValues(alpha: 0.55),
+                      ]),
                 ),
                 child: Row(
                   children: [
@@ -426,29 +408,23 @@ class _TrendingCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: text.titleMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
+                            color: Colors.white, fontWeight: FontWeight.w700),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.90),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+                          color: Colors.white.withValues(alpha: 0.90),
+                          borderRadius: BorderRadius.circular(16)),
                       child: Row(
                         children: [
                           const Icon(Icons.timer_outlined, size: 16),
                           const SizedBox(width: 4),
-                          Text(
-                            '${recipe.cookTimeMinutes}m',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
+                          Text('${recipe.cookTimeMinutes}m',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600)),
                         ],
                       ),
                     ),
@@ -464,16 +440,13 @@ class _TrendingCard extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
+                      color: Colors.white, shape: BoxShape.circle),
                   child: Icon(
-                    saved
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    color: saved ? Colors.red : Colors.black87,
-                    size: 22,
-                  ),
+                      saved
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      color: saved ? Colors.red : Colors.black87,
+                      size: 22),
                 ),
               ),
             ),
@@ -513,12 +486,11 @@ class _LatestStrip extends ConsumerWidget {
               return SizedBox(
                 width: 220,
                 child: _SmallCard(
-                  recipe: r,
-                  saved: saved,
-                  onToggleSave: () => ref
-                      .read(bookmarkIdsNotifierProvider.notifier)
-                      .toggle(r.id),
-                ),
+                    recipe: r,
+                    saved: saved,
+                    onToggleSave: () => ref
+                        .read(bookmarkIdsNotifierProvider.notifier)
+                        .toggle(r.id)),
               );
             },
           );
@@ -532,11 +504,8 @@ class _SmallCard extends StatelessWidget {
   final Recipe recipe;
   final bool saved;
   final VoidCallback onToggleSave;
-  const _SmallCard({
-    required this.recipe,
-    required this.saved,
-    required this.onToggleSave,
-  });
+  const _SmallCard(
+      {required this.recipe, required this.saved, required this.onToggleSave});
 
   @override
   Widget build(BuildContext context) {
@@ -548,8 +517,8 @@ class _SmallCard extends StatelessWidget {
         child: Stack(
           children: [
             Positioned.fill(
-              child: AppNetworkImage(url: recipe.imageUrl, fit: BoxFit.cover),
-            ),
+                child:
+                    AppNetworkImage(url: recipe.imageUrl, fit: BoxFit.cover)),
             Positioned(
               left: 0,
               right: 0,
@@ -558,23 +527,20 @@ class _SmallCard extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(10, 36, 10, 8),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.25),
-                      Colors.black.withValues(alpha: 0.60),
-                    ],
-                  ),
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.25),
+                        Colors.black.withValues(alpha: 0.60),
+                      ]),
                 ),
                 child: Text(
                   recipe.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: text.bodyMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+                      color: Colors.white, fontWeight: FontWeight.w700),
                 ),
               ),
             ),
@@ -586,16 +552,13 @@ class _SmallCard extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
+                      color: Colors.white, shape: BoxShape.circle),
                   child: Icon(
-                    saved
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    size: 18,
-                    color: saved ? Colors.red : Colors.black87,
-                  ),
+                      saved
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      size: 18,
+                      color: saved ? Colors.red : Colors.black87),
                 ),
               ),
             ),
