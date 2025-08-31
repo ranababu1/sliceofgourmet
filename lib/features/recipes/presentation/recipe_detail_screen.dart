@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:html/parser.dart' as html;
 import '../providers.dart';
 import '../../../core/widgets/network_image.dart';
 
@@ -7,25 +8,57 @@ class RecipeDetailScreen extends ConsumerWidget {
   final String recipeId;
   const RecipeDetailScreen({super.key, required this.recipeId});
 
+  String _stripHtml(String htmlSource) {
+    final doc = html.parse(htmlSource);
+    final text = doc.body?.text ?? htmlSource;
+    return text.replaceAll('[…]', '').replaceAll('[&hellip;]', '').trim();
+  }
+
+  String _descriptionFrom(dynamic recipe) {
+    try {
+      final dyn = recipe as dynamic;
+      final contentHtml = dyn.contentHtml as String?;
+      if (contentHtml != null && contentHtml.isNotEmpty) {
+        return _stripHtml(contentHtml);
+      }
+    } catch (_) {
+      // ignore, fall back to excerpt
+    }
+    return _stripHtml(recipe.excerpt);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final asyncRecipe = ref.watch(recipeByIdProvider(recipeId));
-    final bookmarks = ref.watch(bookmarksProvider);
-
-    return asyncRecipe.when(
-      loading: () => Scaffold(
-        appBar: AppBar(title: const Text('Recipe')),
-        body: const Center(child: CircularProgressIndicator()),
-      ),
-      error: (e, st) => Scaffold(
-        appBar: AppBar(title: const Text('Recipe')),
-        body: const Center(child: Text('Could not load recipe')),
-      ),
-      data: (recipe) {
+    final repo = ref.watch(recipeRepositoryProvider);
+    return FutureBuilder<dynamic>(
+      future: repo.fetchById(recipeId),
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Recipe')),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+        final recipe = snap.data!;
+        final bookmarks = ref.watch(bookmarksProvider);
         final isBookmarked = bookmarks.contains(recipe.id);
+
+        final text = Theme.of(context).textTheme;
+        final description = _descriptionFrom(recipe);
+
         return Scaffold(
           appBar: AppBar(
-            title: Text(recipe.title),
+            title: SizedBox(
+              height: kToolbarHeight - 16,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(recipe.title, softWrap: false),
+                ),
+              ),
+            ),
             actions: [
               IconButton(
                 onPressed: () => ref
@@ -34,19 +67,18 @@ class RecipeDetailScreen extends ConsumerWidget {
                 icon: Icon(
                     isBookmarked ? Icons.bookmark : Icons.bookmark_outline),
                 tooltip: isBookmarked ? 'Remove bookmark' : 'Add bookmark',
-              ),
+              )
             ],
           ),
           body: ListView(
             padding: const EdgeInsets.all(12),
             children: [
-              if (recipe.imageUrl.isNotEmpty)
-                AppNetworkImage(
-                  url: recipe.imageUrl,
-                  height: 220,
-                  width: double.infinity,
-                  borderRadius: BorderRadius.circular(18),
-                ),
+              AppNetworkImage(
+                url: recipe.imageUrl,
+                height: 220,
+                width: double.infinity,
+                borderRadius: BorderRadius.circular(18),
+              ),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -62,12 +94,16 @@ class RecipeDetailScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              if (recipe.excerpt.isNotEmpty)
-                Text(recipe.excerpt,
-                    style: Theme.of(context).textTheme.bodyLarge),
+              if (description.isNotEmpty)
+                Text(
+                  description,
+                  style: text.bodyLarge
+                      ?.copyWith(fontFamily: 'Caveat', fontSize: 20),
+                ),
               const SizedBox(height: 16),
               Text('Ingredients',
-                  style: Theme.of(context).textTheme.titleLarge),
+                  style: text.titleLarge
+                      ?.copyWith(fontFamily: 'Caveat', fontSize: 26)),
               const SizedBox(height: 8),
               if (recipe.ingredients.isEmpty)
                 const Text('Ingredients not provided yet'),
@@ -76,12 +112,15 @@ class RecipeDetailScreen extends ConsumerWidget {
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.check_circle_outline),
-                  title: Text(e),
+                  title: Text(e,
+                      style:
+                          const TextStyle(fontFamily: 'Caveat', fontSize: 20)),
                 ),
               ),
               const SizedBox(height: 16),
               Text('Instructions',
-                  style: Theme.of(context).textTheme.titleLarge),
+                  style: text.titleLarge
+                      ?.copyWith(fontFamily: 'Caveat', fontSize: 26)),
               const SizedBox(height: 8),
               if (recipe.instructions.isEmpty)
                 const Text('Instructions not provided yet'),
@@ -94,7 +133,9 @@ class RecipeDetailScreen extends ConsumerWidget {
                         child: Text('${e.key + 1}',
                             style: const TextStyle(fontSize: 12)),
                       ),
-                      title: Text(e.value),
+                      title: Text(e.value,
+                          style: const TextStyle(
+                              fontFamily: 'Caveat', fontSize: 20)),
                     ),
                   ),
               const SizedBox(height: 24),

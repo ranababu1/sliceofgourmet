@@ -25,7 +25,7 @@ class GoogleAuthRepository implements AuthRepository {
     } catch (_) {
       try {
         final i = await d.iosInfo;
-        final machine = i.utsname.machine; // non-null String
+        final machine = i.utsname.machine;
         final m = machine.trim();
         return m.isEmpty ? 'iOS' : m;
       } catch (_) {
@@ -42,6 +42,7 @@ class GoogleAuthRepository implements AuthRepository {
       id: acc.id,
       displayName: acc.displayName ?? acc.email,
       email: acc.email,
+      photoUrl: acc.photoUrl,
     );
   }
 
@@ -53,6 +54,7 @@ class GoogleAuthRepository implements AuthRepository {
       id: acc.id,
       displayName: acc.displayName ?? acc.email,
       email: acc.email,
+      photoUrl: acc.photoUrl,
     );
     final device = await _deviceName();
     await SheetsLogger.logSignup(user, device);

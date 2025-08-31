@@ -4,7 +4,6 @@ const _brandPrimary = Color(0xFF2F855A);
 const _brandAccent = Color(0xFFFFB703);
 
 TextTheme _textTheme(TextTheme base) {
-  // We already registered the font in pubspec, so just use fontFamily below.
   return base.copyWith(
     headlineSmall: base.headlineSmall?.copyWith(letterSpacing: -0.3),
     titleLarge: base.titleLarge?.copyWith(letterSpacing: -0.2),
@@ -26,7 +25,12 @@ ThemeData _baseTheme(Brightness brightness) {
     scaffoldBackgroundColor: brightness == Brightness.light
         ? const Color(0xFFF4F5F7)
         : const Color(0xFF0B1220),
-    appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
+    appBarTheme: AppBarTheme(
+      centerTitle: true,
+      elevation: 0,
+      backgroundColor: cs.surface,
+      foregroundColor: cs.onSurface,
+    ),
     textTheme: _textTheme(ThemeData(brightness: brightness).textTheme),
     cardTheme: const CardThemeData(
       elevation: 1,
