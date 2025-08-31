@@ -4,10 +4,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../recipes/providers.dart';
 import '../../recipes/data/recipe.dart';
-import '../../recipes/data/category.dart';
 import '../../../core/widgets/network_image.dart';
 import '../../../core/widgets/skeletons.dart';
 import '../../../core/data_sync/hydrator.dart';
+import '../../../core/auth/auth_providers.dart';
+import '../../auth/login_sheet.dart';
 import 'search_delegate.dart';
 import 'categories_screen.dart';
 import 'bookmarks_screen.dart';
@@ -30,6 +31,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     SettingsScreen(),
   ];
 
+  Future<void> _selectTab(int i) async {
+    final signedIn = ref.read(isSignedInProvider);
+    if (i != 0 && !signedIn) {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (_) => const LoginSheet(),
+      );
+      return;
+    }
+    setState(() => _index = i);
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.read(hydratorProvider).ensureDailyHydration();
@@ -39,14 +58,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: Stack(
         children: [
           AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              child: _pages[_index]),
+            duration: const Duration(milliseconds: 250),
+            child: _pages[_index],
+          ),
           Align(
             alignment: Alignment.bottomCenter,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-              child: _BottomPillNav(
-                  index: _index, onChanged: (i) => setState(() => _index = i)),
+              child: _BottomPillNav(index: _index, onChanged: _selectTab),
             ),
           ),
         ],
@@ -69,30 +88,35 @@ class _BottomPillNav extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 18,
-              offset: const Offset(0, 8)),
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
         ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _NavIcon(
-              selected: index == 0,
-              icon: Icons.home_rounded,
-              onTap: () => onChanged(0)),
+            selected: index == 0,
+            icon: Icons.home_rounded,
+            onTap: () => onChanged(0),
+          ),
           _NavIcon(
-              selected: index == 1,
-              icon: Icons.grid_view_rounded,
-              onTap: () => onChanged(1)),
+            selected: index == 1,
+            icon: Icons.grid_view_rounded,
+            onTap: () => onChanged(1),
+          ),
           _NavIcon(
-              selected: index == 2,
-              icon: Icons.favorite_rounded,
-              onTap: () => onChanged(2)),
+            selected: index == 2,
+            icon: Icons.favorite_rounded,
+            onTap: () => onChanged(2),
+          ),
           _NavIcon(
-              selected: index == 3,
-              icon: Icons.settings_rounded,
-              onTap: () => onChanged(3)),
+            selected: index == 3,
+            icon: Icons.settings_rounded,
+            onTap: () => onChanged(3),
+          ),
         ],
       ),
     );
@@ -133,6 +157,7 @@ class _HomeTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
+    final user = ref.watch(authControllerProvider);
 
     return SafeArea(
       child: ListView(
@@ -143,9 +168,12 @@ class _HomeTab extends ConsumerWidget {
               const _Avatar(),
               const SizedBox(width: 10),
               Expanded(
-                  child: Text('{user_name}',
-                      style: text.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700))),
+                child: Text(
+                  user == null ? 'Chef' : user.firstName,
+                  style:
+                      text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
               IconButton(
                 icon: const Icon(Icons.notifications_none_rounded),
                 onPressed: () {},
@@ -154,11 +182,14 @@ class _HomeTab extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text("What are you cooking today?",
-              style: text.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0E3B2E),
-                  height: 1.2)),
+          Text(
+            "What's cooking today?",
+            style: text.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0E3B2E),
+              height: 1.2,
+            ),
+          ),
           const SizedBox(height: 16),
           GestureDetector(
             onTap: () async {
@@ -177,8 +208,9 @@ class _HomeTab extends ConsumerWidget {
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none),
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
             ),
@@ -186,15 +218,23 @@ class _HomeTab extends ConsumerWidget {
           const SizedBox(height: 18),
           _TopCategoriesGrid(),
           const SizedBox(height: 18),
-          Text('Trending Recipe',
-              style: text.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800, color: const Color(0xFF0E3B2E))),
+          Text(
+            'Trending Recipe',
+            style: text.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0E3B2E),
+            ),
+          ),
           const SizedBox(height: 12),
           const _TrendingCarousel(),
           const SizedBox(height: 12),
-          Text('Latest',
-              style: text.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800, color: const Color(0xFF0E3B2E))),
+          Text(
+            'Latest',
+            style: text.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0E3B2E),
+            ),
+          ),
           const SizedBox(height: 12),
           const _LatestStrip(),
         ],
@@ -210,9 +250,10 @@ class _Avatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final bg = Theme.of(context).colorScheme.primary.withValues(alpha: 0.15);
     return CircleAvatar(
-        radius: 18,
-        backgroundColor: bg,
-        child: const Text('S', style: TextStyle(fontWeight: FontWeight.w700)));
+      radius: 18,
+      backgroundColor: bg,
+      child: const Text('S', style: TextStyle(fontWeight: FontWeight.w700)),
+    );
   }
 }
 
@@ -221,30 +262,100 @@ class _TopCategoriesGrid extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncTop = ref.watch(topCategoriesProvider);
     final cs = Theme.of(context).colorScheme;
+    final isSignedIn = ref.watch(isSignedInProvider);
+
+    Future<void> requireAuth(BuildContext ctx, VoidCallback onOk) async {
+      if (isSignedIn) {
+        onOk();
+      } else {
+        await showModalBottomSheet(
+          context: ctx,
+          isScrollControlled: true,
+          useSafeArea: true,
+          backgroundColor: Theme.of(ctx).colorScheme.surface,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          builder: (_) => const LoginSheet(),
+        );
+      }
+    }
 
     return asyncTop.when(
       loading: () => GridView.builder(
         physics: const NeverScrollableScrollPhysics(),
         shrinkWrap: true,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            childAspectRatio: 1.05,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10),
+          crossAxisCount: 3,
+          childAspectRatio: 1.05,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+        ),
         itemCount: 6,
         itemBuilder: (_, __) => Container(
           decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(18)),
+            color: cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(18),
+          ),
         ),
       ),
       error: (e, st) => const SizedBox.shrink(),
       data: (top) {
         final tiles = <Widget>[];
         for (final c in top) {
-          tiles.add(_CategoryTile(category: c));
+          tiles.add(
+            Material(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(18),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () => requireAuth(
+                  context,
+                  () => context.push(
+                      '/category/${c.id}?name=${Uri.encodeComponent(c.name)}'),
+                ),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.restaurant_menu_rounded,
+                          color: Color(0xFF2F855A)),
+                      const SizedBox(height: 8),
+                      Text(
+                        c.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 2),
+                      Text('${c.count} recipes',
+                          style: TextStyle(
+                              fontSize: 11, color: cs.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
         }
-        tiles.add(_MoreCategoriesTile());
+        tiles.add(
+          Material(
+            color: cs.primary.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(18),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () =>
+                  requireAuth(context, () => context.push('/categories')),
+              child: const Center(
+                child: Text('More',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700, color: Color(0xFF2F855A))),
+              ),
+            ),
+          ),
+        );
         return GridView.count(
           physics: const NeverScrollableScrollPhysics(),
           shrinkWrap: true,
@@ -255,63 +366,6 @@ class _TopCategoriesGrid extends ConsumerWidget {
           children: tiles,
         );
       },
-    );
-  }
-}
-
-class _CategoryTile extends StatelessWidget {
-  final RecipeCategory category;
-  const _CategoryTile({required this.category});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Material(
-      color: cs.surface,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () => context.push(
-            '/category/${category.id}?name=${Uri.encodeComponent(category.name)}'),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.restaurant_menu_rounded,
-                  color: Color(0xFF2F855A)),
-              const SizedBox(height: 8),
-              Text(category.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 2),
-              Text('${category.count} recipes',
-                  style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MoreCategoriesTile extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Material(
-      color: cs.primary.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () => context.push('/categories'),
-        child: const Center(
-          child: Text('More',
-              style: TextStyle(
-                  fontWeight: FontWeight.w700, color: Color(0xFF2F855A))),
-        ),
-      ),
     );
   }
 }
@@ -330,12 +384,16 @@ class _TrendingCarousel extends ConsumerWidget {
         child: PageView.builder(
           controller: PageController(viewportFraction: 0.85),
           itemBuilder: (_, __) => const Padding(
-              padding: EdgeInsets.only(right: 12), child: ShimmerCardLarge()),
+            padding: EdgeInsets.only(right: 12),
+            child: ShimmerCardLarge(),
+          ),
           itemCount: 3,
         ),
       ),
       error: (e, st) => const SizedBox(
-          height: 60, child: Center(child: Text('Could not load trending'))),
+        height: 60,
+        child: Center(child: Text('Could not load trending')),
+      ),
       data: (items) {
         return SizedBox(
           height: 260,
@@ -368,8 +426,11 @@ class _TrendingCard extends StatelessWidget {
   final bool saved;
   final VoidCallback onToggleSave;
 
-  const _TrendingCard(
-      {required this.recipe, required this.saved, required this.onToggleSave});
+  const _TrendingCard({
+    required this.recipe,
+    required this.saved,
+    required this.onToggleSave,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -392,13 +453,14 @@ class _TrendingCard extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(14, 40, 14, 12),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.25),
-                        Colors.black.withValues(alpha: 0.55),
-                      ]),
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.25),
+                      Colors.black.withValues(alpha: 0.55),
+                    ],
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -408,7 +470,9 @@ class _TrendingCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: text.titleMedium?.copyWith(
-                            color: Colors.white, fontWeight: FontWeight.w700),
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -416,8 +480,9 @@ class _TrendingCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.90),
-                          borderRadius: BorderRadius.circular(16)),
+                        color: Colors.white.withValues(alpha: 0.90),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       child: Row(
                         children: [
                           const Icon(Icons.timer_outlined, size: 16),
@@ -442,11 +507,12 @@ class _TrendingCard extends StatelessWidget {
                   decoration: const BoxDecoration(
                       color: Colors.white, shape: BoxShape.circle),
                   child: Icon(
-                      saved
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
-                      color: saved ? Colors.red : Colors.black87,
-                      size: 22),
+                    saved
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    color: saved ? Colors.red : Colors.black87,
+                    size: 22,
+                  ),
                 ),
               ),
             ),
@@ -486,11 +552,12 @@ class _LatestStrip extends ConsumerWidget {
               return SizedBox(
                 width: 220,
                 child: _SmallCard(
-                    recipe: r,
-                    saved: saved,
-                    onToggleSave: () => ref
-                        .read(bookmarkIdsNotifierProvider.notifier)
-                        .toggle(r.id)),
+                  recipe: r,
+                  saved: saved,
+                  onToggleSave: () => ref
+                      .read(bookmarkIdsNotifierProvider.notifier)
+                      .toggle(r.id),
+                ),
               );
             },
           );
@@ -527,20 +594,23 @@ class _SmallCard extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(10, 36, 10, 8),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.25),
-                        Colors.black.withValues(alpha: 0.60),
-                      ]),
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.25),
+                      Colors.black.withValues(alpha: 0.60),
+                    ],
+                  ),
                 ),
                 child: Text(
                   recipe.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: text.bodyMedium?.copyWith(
-                      color: Colors.white, fontWeight: FontWeight.w700),
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
@@ -554,11 +624,12 @@ class _SmallCard extends StatelessWidget {
                   decoration: const BoxDecoration(
                       color: Colors.white, shape: BoxShape.circle),
                   child: Icon(
-                      saved
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
-                      size: 18,
-                      color: saved ? Colors.red : Colors.black87),
+                    saved
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                    size: 18,
+                    color: saved ? Colors.red : Colors.black87,
+                  ),
                 ),
               ),
             ),
