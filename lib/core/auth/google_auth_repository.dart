@@ -25,8 +25,9 @@ class GoogleAuthRepository implements AuthRepository {
     } catch (_) {
       try {
         final i = await d.iosInfo;
-        final machine = i.utsname.machine; // already a String
-        return (machine?.trim().isEmpty ?? true) ? 'iOS' : machine!;
+        final machine = i.utsname.machine; // non-null String
+        final m = machine.trim();
+        return m.isEmpty ? 'iOS' : m;
       } catch (_) {
         return 'Unknown Device';
       }
