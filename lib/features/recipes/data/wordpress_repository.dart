@@ -25,9 +25,10 @@ class WordPressRecipeRepository implements RecipeRepository {
   }
 
   @override
-  Future<List<Recipe>> fetchTrending({int limit = 10}) async {
+  Future<List<Recipe>> fetchTrending(
+      {int limit = 10, bool forceRefresh = false}) async {
     final cachedIds = store.trendingIds;
-    if (cachedIds != null && cachedIds.isNotEmpty) {
+    if (!forceRefresh && cachedIds != null && cachedIds.isNotEmpty) {
       final cached = _readPostsByIds(cachedIds);
       if (cached.isNotEmpty) return cached;
     }
@@ -55,10 +56,11 @@ class WordPressRecipeRepository implements RecipeRepository {
   }
 
   @override
-  Future<List<Recipe>> fetchLatest({int page = 1, int pageSize = 20}) async {
+  Future<List<Recipe>> fetchLatest(
+      {int page = 1, int pageSize = 20, bool forceRefresh = false}) async {
     final key = 'latest_page_$page';
     final cachedIds = store.readIdList(key);
-    if (cachedIds != null && cachedIds.isNotEmpty) {
+    if (!forceRefresh && cachedIds != null && cachedIds.isNotEmpty) {
       final cached = _readPostsByIds(cachedIds);
       if (cached.isNotEmpty) return cached;
     }
@@ -80,9 +82,9 @@ class WordPressRecipeRepository implements RecipeRepository {
   }
 
   @override
-  Future<Recipe> fetchById(String id) async {
+  Future<Recipe> fetchById(String id, {bool forceRefresh = false}) async {
     final cached = store.readPost(id);
-    if (cached != null) return Recipe.fromJson(cached);
+    if (!forceRefresh && cached != null) return Recipe.fromJson(cached);
 
     final j = await api.fetchPostById(id);
     final r = Recipe.fromWpJson(j);
@@ -91,9 +93,10 @@ class WordPressRecipeRepository implements RecipeRepository {
   }
 
   @override
-  Future<List<RecipeCategory>> fetchCategories() async {
+  Future<List<RecipeCategory>> fetchCategories(
+      {bool forceRefresh = false}) async {
     final cached = store.readCategories();
-    if (cached != null && cached.isNotEmpty) {
+    if (!forceRefresh && cached != null && cached.isNotEmpty) {
       return cached.map((e) => RecipeCategory.fromJson(e)).toList();
     }
     final cats = await api.fetchCategoriesDetailed();

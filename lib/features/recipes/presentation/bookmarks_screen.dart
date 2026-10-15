@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers.dart';
 import '../../../core/widgets/recipe_small_card.dart';
+import '../../../core/widgets/state_views.dart';
 
 class BookmarksScreen extends ConsumerWidget {
   const BookmarksScreen({super.key});
@@ -12,42 +13,68 @@ class BookmarksScreen extends ConsumerWidget {
     final bookmarks = ref.watch(bookmarksProvider);
 
     if (bookmarks.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24.0),
-          child: Text('No bookmarks yet. Tap the heart icon to save a recipe.'),
-        ),
+      return const MessageView(
+        message: 'No bookmarks yet. Tap the heart icon to save a recipe.',
+        icon: Icons.favorite_border_rounded,
       );
     }
 
     return asyncItems.when(
       data: (items) {
-        return GridView.builder(
-          padding: const EdgeInsets.all(8),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: .78,
-          ),
-          itemCount: items.length,
-          itemBuilder: (context, index) {
-            final r = items[index];
-            final isBookmarked = bookmarks.contains(r.id);
-            return Padding(
-              padding: const EdgeInsets.all(6.0),
-              child: RecipeSmallCard(
-                recipe: r,
-                saved: isBookmarked,
-                onToggleSave: () =>
-                    ref.read(bookmarkIdsNotifierProvider.notifier).toggle(r.id),
-                height: 220,
-                width: double.infinity,
+        final missing = bookmarks.length - items.length;
+        if (items.isEmpty) {
+          return MessageView(
+            message: kOfflineMessage,
+            icon: Icons.cloud_off_rounded,
+            onRetry: () => ref.invalidate(bookmarkedRecipesProvider),
+          );
+        }
+        return Column(
+          children: [
+            if (missing > 0)
+              MaterialBanner(
+                content: Text(
+                    '$missing saved recipe${missing == 1 ? '' : 's'} could not be loaded.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => ref.invalidate(bookmarkedRecipesProvider),
+                    child: const Text('Retry'),
+                  ),
+                ],
               ),
-            );
-          },
+            Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 100),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: .78,
+                ),
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final r = items[index];
+                  return Padding(
+                    padding: const EdgeInsets.all(6.0),
+                    child: RecipeSmallCard(
+                      recipe: r,
+                      saved: bookmarks.contains(r.id),
+                      onToggleSave: () => ref
+                          .read(bookmarkIdsNotifierProvider.notifier)
+                          .toggle(r.id),
+                      height: 220,
+                      width: double.infinity,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, st) => const Center(child: Text('Could not load bookmarks')),
+      error: (e, st) => MessageView(
+        message: 'Could not load bookmarks',
+        onRetry: () => ref.invalidate(bookmarkedRecipesProvider),
+      ),
     );
   }
 }

@@ -16,13 +16,17 @@ class AuthController extends StateNotifier<AppUser?> {
   final AuthRepository _repo;
 
   Future<void> _init() async {
-    final u = await _repo.getCurrentUser();
-    state = u;
+    try {
+      final u = await _repo.getCurrentUser();
+      if (mounted) state = u;
+    } catch (_) {}
   }
 
-  Future<void> signInGoogle() async {
+  /// Returns the user, null if cancelled. Throws [AuthException] on failure.
+  Future<AppUser?> signInGoogle() async {
     final u = await _repo.signInWithGoogle();
-    if (u != null) state = u;
+    if (u != null && mounted) state = u;
+    return u;
   }
 
   Future<void> signOut() async {

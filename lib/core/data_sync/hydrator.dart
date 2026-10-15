@@ -1,15 +1,24 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/recipes/data/recipe_repository.dart';
-import '../../features/recipes/providers.dart'; // needed for recipeRepositoryProvider
+import '../../features/recipes/providers.dart';
 import '../cache/local_store.dart';
 
 final localStoreProvider = Provider<LocalStore>((ref) => LocalStore.instance);
 
 final hydratorProvider = Provider<Hydrator>((ref) {
-  final store = ref.read(localStoreProvider);
-  final repo = ref.read(recipeRepositoryProvider);
-  return Hydrator(store, repo);
+  return Hydrator(
+    store: ref.read(localStoreProvider),
+    repo: ref.read(recipeRepositoryProvider),
+    onRefreshed: (at) {
+      // make the UI re-read the fresh cache
+      ref.invalidate(trendingRecipesProvider);
+      ref.invalidate(latestRecipesProvider);
+      ref.invalidate(categoriesProvider);
+      ref.invalidate(bookmarkedRecipesProvider);
+      ref.read(lastHydratedProvider.notifier).state = at;
+    },
+  );
 });
 
 final lastHydratedProvider = StateProvider<DateTime?>((ref) {
@@ -17,9 +26,10 @@ final lastHydratedProvider = StateProvider<DateTime?>((ref) {
 });
 
 class Hydrator {
-  Hydrator(this.store, this.repo);
+  Hydrator({required this.store, required this.repo, this.onRefreshed});
   final LocalStore store;
   final RecipeRepository repo;
+  final void Function(DateTime at)? onRefreshed;
 
   bool _checkedThisSession = false;
 
@@ -28,22 +38,23 @@ class Hydrator {
     _checkedThisSession = true;
 
     final last = store.lastHydratedAt;
-    final now = DateTime.now();
-    if (last == null || now.difference(last).inHours >= 24) {
+    if (last == null || DateTime.now().difference(last).inHours >= 24) {
       await hydrate();
     }
   }
 
-  /// Refresh home essentials, only update cache on success
+  /// Fetch fresh home data from the network (bypassing cache).
+  /// Cache is only overwritten on success.
   Future<bool> hydrate() async {
     try {
-      await repo.fetchTrending(limit: 10);
-      await repo.fetchLatest(page: 1, pageSize: 20);
-      await repo.fetchCategories();
-      await store.setLastHydratedAt(DateTime.now());
+      await repo.fetchTrending(limit: 10, forceRefresh: true);
+      await repo.fetchLatest(page: 1, pageSize: 20, forceRefresh: true);
+      await repo.fetchCategories(forceRefresh: true);
+      final now = DateTime.now();
+      await store.setLastHydratedAt(now);
+      onRefreshed?.call(now);
       return true;
     } catch (_) {
-      // keep existing cache untouched on failures
       return false;
     }
   }
