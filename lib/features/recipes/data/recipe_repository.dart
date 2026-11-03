@@ -1,11 +1,14 @@
 import 'recipe.dart';
 import 'category.dart';
 
+/// Pass `forceRefresh: true` to bypass the local cache and hit the network
+/// (cache is updated only on success).
 abstract class RecipeRepository {
-  Future<List<Recipe>> fetchLatest({int page = 1, int pageSize = 20});
-  Future<List<Recipe>> fetchTrending({int limit = 10});
-  Future<Recipe> fetchById(String id);
-  Future<List<RecipeCategory>> fetchCategories();
+  Future<List<Recipe>> fetchLatest(
+      {int page = 1, int pageSize = 20, bool forceRefresh = false});
+  Future<List<Recipe>> fetchTrending({int limit = 10, bool forceRefresh = false});
+  Future<Recipe> fetchById(String id, {bool forceRefresh = false});
+  Future<List<RecipeCategory>> fetchCategories({bool forceRefresh = false});
   Future<List<Recipe>> search(String query, {int page = 1, int pageSize = 20});
   Future<List<Recipe>> fetchByCategory(int categoryId,
       {int page = 1, int pageSize = 20});
@@ -37,23 +40,26 @@ class MockRecipeRepository implements RecipeRepository {
   ];
 
   @override
-  Future<Recipe> fetchById(String id) async {
+  Future<Recipe> fetchById(String id, {bool forceRefresh = false}) async {
     return _items.firstWhere((e) => e.id == id, orElse: () => _items.first);
   }
 
   @override
-  Future<List<Recipe>> fetchLatest({int page = 1, int pageSize = 20}) async {
+  Future<List<Recipe>> fetchLatest(
+      {int page = 1, int pageSize = 20, bool forceRefresh = false}) async {
     return _items;
   }
 
   @override
-  Future<List<Recipe>> fetchTrending({int limit = 10}) async {
+  Future<List<Recipe>> fetchTrending(
+      {int limit = 10, bool forceRefresh = false}) async {
     return _items.take(limit).toList();
   }
 
   @override
-  Future<List<RecipeCategory>> fetchCategories() async {
-    return _cats..sort((a, b) => b.count.compareTo(a.count));
+  Future<List<RecipeCategory>> fetchCategories(
+      {bool forceRefresh = false}) async {
+    return [..._cats]..sort((a, b) => b.count.compareTo(a.count));
   }
 
   @override

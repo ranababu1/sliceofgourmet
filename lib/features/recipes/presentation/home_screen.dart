@@ -50,8 +50,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(hydratorProvider).ensureDailyHydration();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    ref.read(hydratorProvider).ensureDailyHydration();
+    // after sign out, leave the auth-gated tabs
+    ref.listen(authControllerProvider, (prev, next) {
+      if (next == null && _index != 0) setState(() => _index = 0);
+    });
 
     return Scaffold(
       extendBody: true,
@@ -191,7 +202,16 @@ class _HomeTab extends ConsumerWidget {
     final user = ref.watch(authControllerProvider);
 
     return SafeArea(
-      child: ListView(
+      child: RefreshIndicator(
+        onRefresh: () async {
+          final ok = await ref.read(hydratorProvider).hydrate();
+          if (!ok && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Could not refresh, showing saved recipes')));
+          }
+        },
+        child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
         children: [
           Row(
@@ -260,6 +280,7 @@ class _HomeTab extends ConsumerWidget {
           const SizedBox(height: 12),
           const _LatestStrip(),
         ],
+      ),
       ),
     );
   }

@@ -88,9 +88,17 @@ class BookmarkIdsNotifier extends StateNotifier<Set<String>> {
 final bookmarksProvider =
     Provider<Set<String>>((ref) => ref.watch(bookmarkIdsNotifierProvider));
 
+/// Loads bookmarked recipes; individual failures (deleted post, offline and
+/// not cached) are skipped instead of failing the whole list.
 final bookmarkedRecipesProvider = FutureProvider<List<Recipe>>((ref) async {
   final repo = ref.watch(recipeRepositoryProvider);
   final ids = ref.watch(bookmarksProvider);
-  final futures = ids.map((id) => repo.fetchById(id));
-  return Future.wait(futures);
+  final results = await Future.wait(ids.map((id) async {
+    try {
+      return await repo.fetchById(id);
+    } catch (_) {
+      return null;
+    }
+  }));
+  return results.whereType<Recipe>().toList();
 });
