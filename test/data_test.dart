@@ -13,36 +13,36 @@ import 'package:sliceofgourmet/features/recipes/presentation/paged_recipes.dart'
 import 'fakes.dart';
 
 void main() {
-  group('WordPressApi', () {
+  group('SogApi (transport)', () {
     test('400 past last page maps to empty page', () async {
-      final api = WordPressApi('https://wp.test',
-          client: MockClient((_) async => http.Response(
-              '{"code":"rest_post_invalid_page_number"}', 400)));
-      final page = await api.fetchPostsPage(page: 99);
+      final api = SogApi('https://wp.test',
+          client: MockClient((_) async =>
+              http.Response('{"code":"rest_post_invalid_page_number"}', 400)));
+      final page = await api.fetchRecipes(page: 99);
       expect(page.items, isEmpty);
     });
 
     test('reads X-WP-TotalPages', () async {
-      final api = WordPressApi('https://wp.test',
-          client: MockClient((_) async => http.Response('[]', 200,
-              headers: {'x-wp-totalpages': '7'})));
-      expect((await api.fetchPostsPage()).totalPages, 7);
+      final api = SogApi('https://wp.test',
+          client: MockClient((_) async =>
+              http.Response('[]', 200, headers: {'x-wp-totalpages': '7'})));
+      expect((await api.fetchRecipes()).totalPages, 7);
     });
 
     test('other errors throw', () async {
-      final api = WordPressApi('https://wp.test',
+      final api = SogApi('https://wp.test',
           client: MockClient((_) async => http.Response('', 500)));
-      expect(api.fetchPostsPage(), throwsException);
+      expect(api.fetchRecipes(), throwsException);
     });
 
     test('requests time out', () async {
-      final api = WordPressApi('https://wp.test',
-          timeout: const Duration(milliseconds: 50),
-          client: MockClient((_) async {
-            await Future<void>.delayed(const Duration(seconds: 1));
-            return http.Response('[]', 200);
-          }));
-      expect(api.fetchPostsPage(), throwsA(isA<TimeoutException>()));
+      final api =
+          SogApi('https://wp.test', timeout: const Duration(milliseconds: 50),
+              client: MockClient((_) async {
+        await Future<void>.delayed(const Duration(seconds: 1));
+        return http.Response('[]', 200);
+      }));
+      expect(api.fetchRecipes(), throwsA(isA<TimeoutException>()));
     });
   });
 

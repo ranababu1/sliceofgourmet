@@ -3,27 +3,34 @@ import 'package:sliceofgourmet/core/auth/auth_repository.dart';
 import 'package:sliceofgourmet/features/recipes/data/category.dart';
 import 'package:sliceofgourmet/features/recipes/data/recipe.dart';
 import 'package:sliceofgourmet/features/recipes/data/recipe_repository.dart';
+import 'package:sliceofgourmet/features/recipes/data/wordpress_api.dart';
 
-Recipe fakeRecipe(int i) => Recipe(
+RecipeDetail fakeRecipe(int i) => RecipeDetail(
       id: '$i',
       title: 'Fake Recipe $i',
       excerpt: 'excerpt $i',
-      content: '<p>Body $i</p>',
-      imageUrl: '', // no network images in tests
-      category: 'Dinner',
-      cookTimeMinutes: 10,
-      ingredients: const ['salt'],
-      instructions: const ['cook'],
+      link: 'https://sliceofgourmet.com/dinner/fake-recipe-$i/',
+      // no image: no network images in tests
+      categories: const [RecipeTerm(id: 1, name: 'Dinner', slug: 'dinner')],
+      cookMin: 10,
+      ingredientGroups: const [
+        IngredientGroup(items: [Ingredient(name: 'salt')])
+      ],
+      instructionGroups: const [
+        InstructionGroup(steps: [InstructionStep(text: 'cook')])
+      ],
     );
 
 /// Records forceRefresh flags; no network.
 class FakeRecipeRepository implements RecipeRepository {
   final forceFlags = <String, bool>{};
   Set<String> failingIds = {};
+  Set<String> goneIds = {};
 
   @override
-  Future<Recipe> fetchById(String id, {bool forceRefresh = false}) async {
-    if (failingIds.contains(id)) throw Exception('gone');
+  Future<RecipeDetail> fetchById(String id, {bool forceRefresh = false}) async {
+    if (goneIds.contains(id)) throw RecipeNotFoundException(id);
+    if (failingIds.contains(id)) throw Exception('offline');
     return fakeRecipe(int.parse(id));
   }
 
@@ -57,6 +64,12 @@ class FakeRecipeRepository implements RecipeRepository {
   Future<List<Recipe>> fetchByCategory(int categoryId,
           {int page = 1, int pageSize = 20}) async =>
       [];
+
+  @override
+  Future<String?> resolveLink(Uri link) async =>
+      link.path.contains('fake-recipe-')
+          ? link.pathSegments.where((s) => s.isNotEmpty).last.split('-').last
+          : null;
 }
 
 class FakeAuthRepository implements AuthRepository {

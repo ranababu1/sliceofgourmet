@@ -1,0 +1,131 @@
+[
+ {
+  "id": 2623,
+  "title": "Mooli ka Raita",
+  "slug": "mooli-ka-raita",
+  "link": "https://sliceofgourmet.com/side-dish/mooli-ka-raita/",
+  "date_gmt": "2022-09-22T21:08:22",
+  "modified_gmt": "2026-11-16T23:03:35",
+  "excerpt": "Whenever I used to hear about mooli ka Raita (radish dip) I used to turn up my nose and look away. I\u2026",
+  "categories": [
+   {
+    "id": 42,
+    "name": "Side Dish",
+    "slug": "side-dish"
+   }
+  ],
+  "recipe_card": {
+   "has_recipe": true,
+   "prep_min": 20,
+   "cook_min": 0,
+   "total_min": 20,
+   "servings": 4,
+   "servings_unit": "",
+   "yield": "",
+   "difficulty": "medium",
+   "calories": 0,
+   "cuisine": [
+    "Indian"
+   ],
+   "diet": [],
+   "ingredient_count": 9,
+   "step_count": 10,
+   "image": {
+    "id": 2624,
+    "url": "https://i0.wp.com/sliceofgourmet.com/wp-content/uploads/2022/09/Mooli-ka-Raita2-scaled.jpg?fit=720%2C659&ssl=1",
+    "width": 720,
+    "height": 659,
+    "thumb_url": "https://i0.wp.com/sliceofgourmet.com/wp-content/uploads/2022/09/Mooli-ka-Raita2-scaled.jpg?fit=300%2C275&ssl=1"
+   }
+  }
+ },
+ {
+  "id": 1931,
+  "title": "Crispy Ginger Beef",
+  "slug": "crispy-ginger-beef",
+  "link": "https://sliceofgourmet.com/specials/crispy-ginger-beef/",
+  "date_gmt": "2021-08-12T22:56:36",
+  "modified_gmt": "2026-11-16T23:03:33",
+  "excerpt": "",
+  "categories": [
+   {
+    "id": 115,
+    "name": "Lunch/Dinner",
+    "slug": "lunch-dinner"
+   },
+   {
+    "id": 48,
+    "name": "Main Course",
+    "slug": "main-course"
+   },
+   {
+    "id": 1,
+    "name": "Specialized Diets",
+    "slug": "specials"
+   }
+  ],
+  "recipe_card": {
+   "has_recipe": true,
+   "prep_min": 25,
+   "cook_min": 25,
+   "total_min": 50,
+   "servings": 4,
+   "servings_unit": "",
+   "yield": "",
+   "difficulty": "medium",
+   "calories": 0,
+   "cuisine": [
+    "Chinese"
+   ],
+   "diet": [],
+   "ingredient_count": 19,
+   "step_count": 8,
+   "image": null
+  }
+ },
+ {
+  "id": 1127,
+  "title": "Instant Pot Ghee",
+  "slug": "instant-pot-ghee",
+  "link": "https://sliceofgourmet.com/side-dish/instant-pot-ghee/",
+  "date_gmt": "2021-08-04T12:37:55",
+  "modified_gmt": "2026-11-16T23:03:30",
+  "excerpt": "Did you make this recipe? Take a picture and please tag me at\u00a0#sliceofgourmet. Your appreciation and pictures and tags inspires me to\u2026",
+  "categories": [
+   {
+    "id": 142,
+    "name": "Condiments",
+    "slug": "condiments"
+   },
+   {
+    "id": 42,
+    "name": "Side Dish",
+    "slug": "side-dish"
+   }
+  ],
+  "recipe_card": {
+   "has_recipe": true,
+   "prep_min": 5,
+   "cook_min": 20,
+   "total_min": 25,
+   "servings": 0,
+   "servings_unit": "",
+   "yield": "about 2 cups",
+   "difficulty": "easy",
+   "calories": 0,
+   "cuisine": [
+    "Indian"
+   ],
+   "diet": [],
+   "ingredient_count": 1,
+   "step_count": 4,
+   "image": {
+    "id": 1128,
+    "url": "https://i0.wp.com/sliceofgourmet.com/wp-content/uploads/2021/08/ghee.webp?fit=720%2C720&ssl=1",
+    "width": 720,
+    "height": 720,
+    "thumb_url": "https://i0.wp.com/sliceofgourmet.com/wp-content/uploads/2021/08/ghee.webp?fit=300%2C300&ssl=1"
+   }
+  }
+ }
+]
