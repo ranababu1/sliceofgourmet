@@ -6,28 +6,54 @@ import 'category.dart';
 abstract class RecipeRepository {
   Future<List<Recipe>> fetchLatest(
       {int page = 1, int pageSize = 20, bool forceRefresh = false});
-  Future<List<Recipe>> fetchTrending({int limit = 10, bool forceRefresh = false});
-  Future<Recipe> fetchById(String id, {bool forceRefresh = false});
+  Future<List<Recipe>> fetchTrending(
+      {int limit = 10, bool forceRefresh = false});
+
+  /// Full recipe. Throws `RecipeNotFoundException` when it no longer exists.
+  Future<RecipeDetail> fetchById(String id, {bool forceRefresh = false});
   Future<List<RecipeCategory>> fetchCategories({bool forceRefresh = false});
   Future<List<Recipe>> search(String query, {int page = 1, int pageSize = 20});
   Future<List<Recipe>> fetchByCategory(int categoryId,
       {int page = 1, int pageSize = 20});
+
+  /// Post id for a sliceofgourmet.com permalink, or null.
+  Future<String?> resolveLink(Uri link);
 }
 
 /// Simple in memory mock for tests and previews
 class MockRecipeRepository implements RecipeRepository {
-  final List<Recipe> _items = List.generate(
+  final List<RecipeDetail> _items = List.generate(
     10,
-    (i) => Recipe(
+    (i) => RecipeDetail(
       id: '$i',
       title: 'Sample Recipe $i',
+      slug: 'sample-recipe-$i',
+      link: 'https://sliceofgourmet.com/main-course/sample-recipe-$i/',
       excerpt: 'Tasty sample $i',
-      content: '<p>Mock content</p>',
-      imageUrl: 'https://picsum.photos/seed/mock$i/800/600',
-      category: i.isEven ? 'Dinner' : 'Lunch',
-      cookTimeMinutes: 20 + i,
-      ingredients: const ['1 cup flour', '2 eggs', 'Salt to taste'],
-      instructions: const ['Mix ingredients', 'Cook until done', 'Serve hot'],
+      categories: [
+        i.isEven
+            ? const RecipeTerm(id: 3, name: 'Dinner', slug: 'dinner')
+            : const RecipeTerm(id: 2, name: 'Lunch', slug: 'lunch'),
+      ],
+      image:
+          RecipeImage(id: i, url: 'https://picsum.photos/seed/mock$i/800/600'),
+      cookMin: 20 + i,
+      totalMin: 30 + i,
+      servings: 4,
+      ingredientGroups: const [
+        IngredientGroup(items: [
+          Ingredient(text: '1 cup flour'),
+          Ingredient(text: '2 eggs'),
+          Ingredient(text: 'Salt to taste'),
+        ]),
+      ],
+      instructionGroups: const [
+        InstructionGroup(steps: [
+          InstructionStep(text: 'Mix ingredients'),
+          InstructionStep(text: 'Cook until done'),
+          InstructionStep(text: 'Serve hot'),
+        ]),
+      ],
     ),
   );
 
@@ -40,7 +66,7 @@ class MockRecipeRepository implements RecipeRepository {
   ];
 
   @override
-  Future<Recipe> fetchById(String id, {bool forceRefresh = false}) async {
+  Future<RecipeDetail> fetchById(String id, {bool forceRefresh = false}) async {
     return _items.firstWhere((e) => e.id == id, orElse: () => _items.first);
   }
 
@@ -72,8 +98,14 @@ class MockRecipeRepository implements RecipeRepository {
   @override
   Future<List<Recipe>> fetchByCategory(int categoryId,
       {int page = 1, int pageSize = 20}) async {
-    // mock maps odd ids to Lunch, even to Dinner
-    final name = categoryId.isEven ? 'Dinner' : 'Lunch';
-    return _items.where((e) => e.category == name).toList();
+    return _items
+        .where((e) => e.categories.any((c) => c.id == categoryId))
+        .toList();
+  }
+
+  @override
+  Future<String?> resolveLink(Uri link) async {
+    final slug = link.pathSegments.where((s) => s.isNotEmpty).lastOrNull;
+    return _items.where((e) => e.slug == slug).firstOrNull?.id;
   }
 }

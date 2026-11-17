@@ -6,9 +6,9 @@ plugins {
 }
 
 android {
-    namespace = "com.sliceofgourmet.app"
+    namespace = "dev.imrn.sliceofgourmet"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973"
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -21,7 +21,7 @@ android {
 
     defaultConfig {
     // ApplicationId / package name for the Android app
-    applicationId = "com.sliceofgourmet.app"
+    applicationId = "dev.imrn.sliceofgourmet"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

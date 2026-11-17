@@ -31,6 +31,11 @@ class AppNetworkImage extends StatelessWidget {
           color: placeholderColor,
           borderRadius: borderRadius,
         ),
+        alignment: Alignment.center,
+        child: Icon(
+          Icons.restaurant_menu_rounded,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       );
     }
     return ClipRRect(
