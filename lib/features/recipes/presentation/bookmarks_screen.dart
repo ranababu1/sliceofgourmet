@@ -20,9 +20,11 @@ class BookmarksScreen extends ConsumerWidget {
     }
 
     return asyncItems.when(
-      data: (items) {
-        final missing = bookmarks.length - items.length;
-        if (items.isEmpty) {
+      data: (result) {
+        final items =
+            result.items.where((r) => bookmarks.contains(r.id)).toList();
+        final gone = result.goneIds.intersection(bookmarks);
+        if (items.isEmpty && gone.isEmpty) {
           return MessageView(
             message: kOfflineMessage,
             icon: Icons.cloud_off_rounded,
@@ -31,10 +33,23 @@ class BookmarksScreen extends ConsumerWidget {
         }
         return Column(
           children: [
-            if (missing > 0)
+            if (gone.isNotEmpty)
               MaterialBanner(
                 content: Text(
-                    '$missing saved recipe${missing == 1 ? '' : 's'} could not be loaded.'),
+                    '${gone.length} saved recipe${gone.length == 1 ? ' is' : 's are'} no longer on the site.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => ref
+                        .read(bookmarkIdsNotifierProvider.notifier)
+                        .removeAll(gone),
+                    child: const Text('Remove'),
+                  ),
+                ],
+              ),
+            if (result.failed > 0)
+              MaterialBanner(
+                content: Text(
+                    '${result.failed} saved recipe${result.failed == 1 ? '' : 's'} could not be loaded.'),
                 actions: [
                   TextButton(
                     onPressed: () => ref.invalidate(bookmarkedRecipesProvider),

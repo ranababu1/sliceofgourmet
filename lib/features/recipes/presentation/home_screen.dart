@@ -519,25 +519,28 @@ class _TrendingCard extends StatelessWidget {
                             color: Colors.white, fontWeight: FontWeight.w700),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(16)),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.timer_outlined,
-                              size: 16, color: Colors.white),
-                          const SizedBox(width: 4),
-                          Text('${recipe.cookTimeMinutes}m',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600)),
-                        ],
+                    if (formatMinutesShort(recipe.displayMinutes)
+                        case final mins?) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.55),
+                            borderRadius: BorderRadius.circular(16)),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.timer_outlined,
+                                size: 16, color: Colors.white),
+                            const SizedBox(width: 4),
+                            Text(mins,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600)),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),

@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _baseUrl = 'https://sliceofgourmet.com';
 
-final _apiProvider = Provider<WordPressApi>((ref) => WordPressApi(_baseUrl));
+final _apiProvider = Provider<SogApi>((ref) => SogApi(_baseUrl));
 final _storeProvider = Provider<LocalStore>((ref) => LocalStore.instance);
 
 final recipeRepositoryProvider = Provider<RecipeRepository>((ref) {
@@ -17,9 +17,9 @@ final recipeRepositoryProvider = Provider<RecipeRepository>((ref) {
       ref.read(_apiProvider), ref.read(_storeProvider));
 });
 
-/// detail provider, fixes "recipeByIdProvider isn't defined"
+/// Full recipe for the detail screen.
 final recipeByIdProvider =
-    FutureProvider.family<Recipe, String>((ref, id) async {
+    FutureProvider.family<RecipeDetail, String>((ref, id) async {
   final repo = ref.watch(recipeRepositoryProvider);
   return repo.fetchById(id);
 });
@@ -55,12 +55,25 @@ final searchResultsProvider =
   return repo.search(q);
 });
 
+/// Resolves a shared sliceofgourmet.com link to a post id (null if it is
+/// not a recipe).
+final linkResolverProvider =
+    FutureProvider.family<String?, String>((ref, url) async {
+  final repo = ref.watch(recipeRepositoryProvider);
+  return repo.resolveLink(Uri.parse(url));
+});
+
 // bookmarks
+const _bookmarksKey = 'bookmarks';
+const _bookmarksVersionKey = 'bookmarks_v';
+
 final bookmarkIdsNotifierProvider =
     StateNotifierProvider<BookmarkIdsNotifier, Set<String>>((ref) {
   return BookmarkIdsNotifier();
 });
 
+/// Saved recipe ids. These are WordPress post ids, which did not change in
+/// the move from WP Recipe Maker to sog-recipes, so v1 bookmarks carry over.
 class BookmarkIdsNotifier extends StateNotifier<Set<String>> {
   BookmarkIdsNotifier() : super({}) {
     _load();
@@ -68,8 +81,20 @@ class BookmarkIdsNotifier extends StateNotifier<Set<String>> {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-    final ids = prefs.getStringList('bookmarks') ?? [];
-    state = ids.toSet();
+    var ids = prefs.getStringList(_bookmarksKey) ?? [];
+    if (prefs.getInt(_bookmarksVersionKey) != 2) {
+      // drop anything that is not a numeric post id
+      ids = ids.where((e) => int.tryParse(e) != null).toSet().toList();
+      await prefs.setStringList(_bookmarksKey, ids);
+      await prefs.setInt(_bookmarksVersionKey, 2);
+    }
+    // keep anything toggled before loading finished
+    state = {...ids, ...state};
+  }
+
+  Future<void> _save() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_bookmarksKey, state.toList());
   }
 
   Future<void> toggle(String id) async {
@@ -80,25 +105,48 @@ class BookmarkIdsNotifier extends StateNotifier<Set<String>> {
       next.add(id);
     }
     state = next;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('bookmarks', state.toList());
+    await _save();
+  }
+
+  Future<void> removeAll(Iterable<String> ids) async {
+    state = state.difference(ids.toSet());
+    await _save();
   }
 }
 
 final bookmarksProvider =
     Provider<Set<String>>((ref) => ref.watch(bookmarkIdsNotifierProvider));
 
-/// Loads bookmarked recipes; individual failures (deleted post, offline and
-/// not cached) are skipped instead of failing the whole list.
-final bookmarkedRecipesProvider = FutureProvider<List<Recipe>>((ref) async {
+class BookmarkedRecipes {
+  const BookmarkedRecipes(this.items,
+      {this.goneIds = const {}, this.failed = 0});
+  final List<Recipe> items;
+
+  /// Saved recipes the site says no longer exist.
+  final Set<String> goneIds;
+
+  /// Saved recipes that could not be loaded (offline and not cached).
+  final int failed;
+}
+
+/// Loads bookmarked recipes; individual failures are reported instead of
+/// failing the whole list.
+final bookmarkedRecipesProvider =
+    FutureProvider<BookmarkedRecipes>((ref) async {
   final repo = ref.watch(recipeRepositoryProvider);
   final ids = ref.watch(bookmarksProvider);
+  final gone = <String>{};
+  var failed = 0;
   final results = await Future.wait(ids.map((id) async {
     try {
       return await repo.fetchById(id);
+    } on RecipeNotFoundException {
+      gone.add(id);
     } catch (_) {
-      return null;
+      failed++;
     }
+    return null;
   }));
-  return results.whereType<Recipe>().toList();
+  return BookmarkedRecipes(results.whereType<Recipe>().toList(),
+      goneIds: gone, failed: failed);
 });
