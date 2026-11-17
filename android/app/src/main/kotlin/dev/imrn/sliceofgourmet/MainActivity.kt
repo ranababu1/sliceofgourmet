@@ -1,4 +1,4 @@
-package com.example.sliceofgourmet
+package dev.imrn.sliceofgourmet
 
 import io.flutter.embedding.android.FlutterActivity
 
