@@ -1,30 +1,39 @@
-# Recipe App
+# Slice of Gourmet
 
-## Overview
+Recipe app for [sliceofgourmet.com](https://sliceofgourmet.com), built with Flutter for Android and iOS.
 
-A simple and intuitive recipe app that allows users to search and explore various recipes. The app fetches its data from an external datasource, providing up-to-date recipes from different cuisines, ingredients, and cooking techniques.
+## Features
 
-### Key Features
+- Every recipe from the site, cached on the device and usable offline
+- Search, categories, saved recipes and a clean step by step recipe view
+- Light and dark themes, subtle motion that respects the system reduce motion setting
+- Optional Google sign-in
 
-* Search Functionality: Users can search for recipes based on ingredients, cuisine, or recipe name.
-* External Data Integration: The app retrieves recipes from a reliable external API, ensuring a constantly refreshed set of recipes.
-* Filter Options: Sort recipes by difficulty, cooking time, and dietary restrictions (e.g., vegetarian, gluten-free).
-* Favorites: Users can mark their favorite recipes for easy access later.
+## How data loads
 
-## Data source
+Recipes come from the `sog-recipes` plugin on the site (read only):
 
-Recipes come from the sog-recipes plugin on sliceofgourmet.com (read only):
+- `GET /wp-json/sog/v1/manifest` small catalog fingerprint, checked before any sync
+- `GET /wp-json/sog/v1/recipes` recipe cards and full recipes (`page`, `per_page`, `modified_after`, `full`)
+- `GET /wp-json/sog/v1/recipes/ids` every id with its modified time
+- `GET /wp-json/sog/v1/recipes/{id}` one full recipe
+- `GET /wp-json/wp/v2/categories` and `wp/v2/posts?slug=` for categories and shared links
 
-- `GET /wp-json/sog/v1/recipes` list cards (`page`, `per_page`, `search`, `category`)
-- `GET /wp-json/sog/v1/recipes/{id}` full recipe
-- `GET /wp-json/wp/v2/categories` categories, `GET /wp-json/wp/v2/posts?slug=` for shared links
+First launch downloads the catalog in pages of 50 with a progress screen. After that the app checks
+the manifest at most every 6 hours (or when the user taps refresh, limited to once per 15 minutes)
+and only downloads recipes that changed. Screens read from the local cache. See RELEASE.md for details.
 
 Test fixtures in `test/fixtures` are captured from the live API.
 
-## Release
+## Develop
 
 ```
+flutter pub get
+flutter analyze
 flutter test
-flutter build appbundle --release   # Android
-flutter build ipa --release         # iOS, on a Mac
+flutter run
 ```
+
+## Release
+
+See [RELEASE.md](RELEASE.md).
