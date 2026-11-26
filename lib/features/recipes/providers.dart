@@ -7,7 +7,10 @@ import 'data/category.dart';
 import '../../core/cache/local_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const kSiteBaseUrl = 'https://sliceofgourmet.com';
+/// Site the app reads from. Override for staging or local testing:
+///   --dart-define=SOG_BASE_URL=https://staging.example
+const kSiteBaseUrl = String.fromEnvironment('SOG_BASE_URL',
+    defaultValue: 'https://sliceofgourmet.com');
 
 final sogApiProvider = Provider<SogApi>((ref) => SogApi(kSiteBaseUrl));
 final localStoreProvider = Provider<LocalStore>((ref) => LocalStore.instance);

@@ -4,6 +4,7 @@ import '../../core/analytics/consent.dart';
 import '../../core/auth/auth_providers.dart';
 import '../../core/auth/auth_repository.dart';
 import '../../core/privacy.dart';
+import '../../core/theme.dart';
 
 class LoginSheet extends ConsumerStatefulWidget {
   const LoginSheet({super.key});
@@ -49,22 +50,11 @@ class _LoginSheetState extends ConsumerState<LoginSheet> {
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-                height: 4,
-                width: 44,
-                decoration: BoxDecoration(
-                    color: cs.outlineVariant,
-                    borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 16),
-            Text('Sign in',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w800)),
+            Text('Sign in', style: display(26, color: cs.onSurface)),
             const SizedBox(height: 6),
             Text('Sign in to access bookmarks, categories and settings',
                 style: Theme.of(context).textTheme.bodyMedium),

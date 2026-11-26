@@ -151,8 +151,9 @@ class _RecipeDetailBodyState extends ConsumerState<_RecipeDetailBody> {
     final hasPhoto = recipe.image != null;
 
     final stats = <(IconData, String, String)>[
-      if (formatMinutes(recipe.displayMinutes) case final t?)
-        (Icons.schedule_rounded, 'Time', t),
+      if (times.length <= 1)
+        if (formatMinutes(recipe.displayMinutes) case final t?)
+          (Icons.schedule_rounded, 'Time', t),
       if (recipe.servingsLabel case final s?) (Icons.people_alt_outlined, 'Serves', s),
       if (recipe.difficultyLabel case final d?)
         (Icons.signal_cellular_alt_rounded, 'Level', d),
@@ -235,21 +236,27 @@ class _RecipeDetailBodyState extends ConsumerState<_RecipeDetailBody> {
                             ),
                           ),
                         ),
+                        // rounded lip the content appears to slide out of
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: -1,
+                          height: 28,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: cs.surface,
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(28)),
+                            ),
+                          ),
+                        ),
                       ]),
                     )
                   : null,
             ),
             SliverToBoxAdapter(
-              child: Container(
-                transform: hasPhoto
-                    ? Matrix4.translationValues(0, -24, 0)
-                    : null,
-                decoration: BoxDecoration(
-                  color: cs.surface,
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(28)),
-                ),
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, hasPhoto ? 4 : 20, 20, 40),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

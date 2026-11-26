@@ -402,7 +402,6 @@ class _SearchPill extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: cs.onSurfaceVariant)),
           ),
-          Icon(Icons.tune_rounded, color: cs.primary, size: 20),
         ]),
       ),
     );
