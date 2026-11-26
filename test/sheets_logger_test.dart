@@ -31,8 +31,8 @@ void main() {
 
   test('no-op without consent', () async {
     SharedPreferences.setMockInitialValues({});
-    final logger =
-        SheetsLogger(client: client, url: 'https://hook.test/exec', secret: 's');
+    final logger = SheetsLogger(
+        client: client, url: 'https://hook.test/exec', secret: 's');
     expect(await logger.logSignupIfNeeded(user, 'Pixel'), isFalse);
     expect(calls, isEmpty);
   });
@@ -53,8 +53,7 @@ void main() {
   test('failed post is retried next time', () async {
     SharedPreferences.setMockInitialValues({kAnalyticsConsentKey: true});
     var fail = true;
-    final c = MockClient((req) async =>
-        http.Response('', fail ? 500 : 200));
+    final c = MockClient((req) async => http.Response('', fail ? 500 : 200));
     final logger =
         SheetsLogger(client: c, url: 'https://hook.test/exec', secret: '');
     expect(await logger.logSignupIfNeeded(user, 'Pixel'), isFalse);

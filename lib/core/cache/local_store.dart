@@ -21,9 +21,8 @@ class LocalStore {
 
   /// [inMemory] keeps everything in RAM (widget tests).
   static Future<void> init({bool inMemory = false}) async {
-    Future<Box> open(String name) => inMemory
-        ? Hive.openBox(name, bytes: Uint8List(0))
-        : Hive.openBox(name);
+    Future<Box> open(String name) =>
+        inMemory ? Hive.openBox(name, bytes: Uint8List(0)) : Hive.openBox(name);
     _posts = await open('posts');
     _lists = await open('lists');
     _meta = await open('meta');
@@ -131,7 +130,8 @@ class LocalStore {
 
   /// Earliest time an automatic sync may run (error backoff).
   DateTime? get nextAutoSyncAt => _date('nextAutoSyncAt');
-  Future<void> setNextAutoSyncAt(DateTime? dt) => _setDate('nextAutoSyncAt', dt);
+  Future<void> setNextAutoSyncAt(DateTime? dt) =>
+      _setDate('nextAutoSyncAt', dt);
 
   int get autoSyncFailures => (_meta.get('autoSyncFailures') as int?) ?? 0;
   Future<void> setAutoSyncFailures(int n) => _meta.put('autoSyncFailures', n);

@@ -74,14 +74,16 @@ class SettingsScreen extends ConsumerWidget {
             const Divider(),
           ],
           const _SectionHeader('Privacy'),
-          SwitchListTile(
-            secondary: const Icon(Icons.analytics_outlined),
-            title: const Text('Share signup info'),
-            subtitle: const Text(
-                'Send my name, email and device model to Slice of Gourmet when I sign up'),
-            value: consent,
-            onChanged: (v) => ref.read(analyticsConsentProvider.notifier).set(v),
-          ),
+          if (ref.watch(signInAvailableProvider))
+            SwitchListTile(
+              secondary: const Icon(Icons.analytics_outlined),
+              title: const Text('Share signup info'),
+              subtitle: const Text(
+                  'Send my name, email and device model to Slice of Gourmet when I sign up'),
+              value: consent,
+              onChanged: (v) =>
+                  ref.read(analyticsConsentProvider.notifier).set(v),
+            ),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
             title: const Text('Privacy policy'),

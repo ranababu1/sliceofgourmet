@@ -20,10 +20,11 @@ import 'categories_screen.dart';
 import 'bookmarks_screen.dart';
 import 'settings_screen.dart';
 
-/// Opens the sign-in sheet; [onOk] runs right away when already signed in.
+/// Opens the sign-in sheet; [onOk] runs right away when already signed in,
+/// or when sign-in is not set up on this platform.
 Future<void> requireSignIn(
     BuildContext context, WidgetRef ref, VoidCallback onOk) async {
-  if (ref.read(isSignedInProvider)) {
+  if (ref.read(isSignedInProvider) || !ref.read(signInAvailableProvider)) {
     onOk();
     return;
   }
@@ -208,8 +209,7 @@ class _PillNavItem extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon,
-                  size: 22,
-                  color: selected ? Colors.white : Colors.white70),
+                  size: 22, color: selected ? Colors.white : Colors.white70),
               AnimatedSize(
                 duration: d,
                 curve: kEase,
@@ -383,8 +383,8 @@ class _SearchPill extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Pressable(
       semanticLabel: 'Search recipes',
-      onTap: () =>
-          showSearch<String?>(context: context, delegate: RecipeSearchDelegate()),
+      onTap: () => showSearch<String?>(
+          context: context, delegate: RecipeSearchDelegate()),
       child: Container(
         height: 54,
         padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -615,12 +615,12 @@ class _LatestGrid extends ConsumerWidget {
                     message: 'No recipes yet. Pull down to check again.',
                     icon: Icons.menu_book_outlined))
             : RecipeSliverGrid(
-          items: items,
-          saved: saved,
-          heroScope: 'latest',
-          onToggleSave: (id) =>
-              ref.read(bookmarkIdsNotifierProvider.notifier).toggle(id),
-        ),
+                items: items,
+                saved: saved,
+                heroScope: 'latest',
+                onToggleSave: (id) =>
+                    ref.read(bookmarkIdsNotifierProvider.notifier).toggle(id),
+              ),
       ),
     );
   }
@@ -676,8 +676,7 @@ class FirstRunView extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
-                            color: cs.primaryContainer,
-                            shape: BoxShape.circle),
+                            color: cs.primaryContainer, shape: BoxShape.circle),
                         child: Icon(Icons.restaurant_menu_rounded,
                             size: 40, color: cs.primary),
                       ),

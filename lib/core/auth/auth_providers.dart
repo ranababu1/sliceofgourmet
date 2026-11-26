@@ -42,3 +42,8 @@ final authControllerProvider = StateNotifierProvider<AuthController, AppUser?>(
 final isSignedInProvider = Provider<bool>(
   (ref) => ref.watch(authControllerProvider) != null,
 );
+
+/// When false, sign-in is hidden and nothing is gated behind it.
+final signInAvailableProvider = Provider<bool>(
+  (ref) => ref.watch(authRepositoryProvider).isAvailable,
+);

@@ -15,8 +15,10 @@ class RecipeSearchDelegate extends SearchDelegate<String?> {
   ThemeData appBarTheme(BuildContext context) {
     final t = Theme.of(context);
     return t.copyWith(
-      appBarTheme: t.appBarTheme.copyWith(backgroundColor: t.colorScheme.surface),
-      inputDecorationTheme: const InputDecorationTheme(border: InputBorder.none),
+      appBarTheme:
+          t.appBarTheme.copyWith(backgroundColor: t.colorScheme.surface),
+      inputDecorationTheme:
+          const InputDecorationTheme(border: InputBorder.none),
     );
   }
 

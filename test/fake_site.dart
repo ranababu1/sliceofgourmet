@@ -122,7 +122,10 @@ class FakeSite {
       }
       final body = f.existsSync()
           ? fixtureMap('recipe_${m[1]}.json')
-          : {...cards[m[1]]!, 'recipe': {'name': cards[m[1]]!['title']}};
+          : {
+              ...cards[m[1]]!,
+              'recipe': {'name': cards[m[1]]!['title']}
+            };
       if (cards[m[1]] case final c?) body['modified_gmt'] = c['modified_gmt'];
       return _json(body, req);
     }
@@ -131,7 +134,9 @@ class FakeSite {
     }
     if (p == '/wp-json/wp/v2/posts') {
       final hit = cards.values.where((c) => c['slug'] == q['slug']);
-      return _json([for (final c in hit) {'id': c['id']}], req);
+      return _json([
+        for (final c in hit) {'id': c['id']}
+      ], req);
     }
     return http.Response('not found', 404);
   });

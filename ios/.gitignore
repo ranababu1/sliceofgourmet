@@ -32,3 +32,6 @@ Runner/GeneratedPluginRegistrant.*
 !default.mode2v3
 !default.pbxuser
 !default.perspectivev3
+
+# Local Google sign-in config (see RELEASE.md)
+Flutter/GoogleSignIn.xcconfig

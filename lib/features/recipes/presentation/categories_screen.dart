@@ -54,7 +54,8 @@ class CategoriesScreen extends ConsumerWidget {
                 itemCount: cats.length,
                 itemBuilder: (_, i) {
                   final c = cats[i];
-                  final tint = i.isEven ? cs.primaryContainer : cs.surfaceContainer;
+                  final tint =
+                      i.isEven ? cs.primaryContainer : cs.surfaceContainer;
                   return FadeSlideIn(
                     index: i,
                     child: Pressable(
@@ -83,8 +84,8 @@ class CategoriesScreen extends ConsumerWidget {
                                         fontWeight: FontWeight.w700)),
                                 Text(
                                     '${c.count} recipe${c.count == 1 ? '' : 's'}',
-                                    style: text.labelMedium?.copyWith(
-                                        color: cs.onSurfaceVariant)),
+                                    style: text.labelMedium
+                                        ?.copyWith(color: cs.onSurfaceVariant)),
                               ],
                             ),
                           ],

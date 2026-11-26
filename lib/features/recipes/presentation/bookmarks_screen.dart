@@ -22,7 +22,8 @@ class BookmarksScreen extends ConsumerWidget {
           SliverFillRemaining(
             hasScrollBody: false,
             child: MessageView(
-              message: 'Nothing saved yet. Tap the heart on any recipe to keep it here.',
+              message:
+                  'Nothing saved yet. Tap the heart on any recipe to keep it here.',
               icon: Icons.favorite_border_rounded,
             ),
           ),
@@ -80,7 +81,8 @@ class BookmarksScreen extends ConsumerWidget {
                       '${result.failed} saved recipe${result.failed == 1 ? '' : 's'} could not be loaded.'),
                   actions: [
                     TextButton(
-                      onPressed: () => ref.invalidate(bookmarkedRecipesProvider),
+                      onPressed: () =>
+                          ref.invalidate(bookmarkedRecipesProvider),
                       child: const Text('Retry'),
                     ),
                   ],

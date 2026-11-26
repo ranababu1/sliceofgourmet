@@ -34,7 +34,8 @@ class MessageView extends StatelessWidget {
                 style: TextStyle(color: cs.onSurfaceVariant, height: 1.4)),
             if (onRetry != null) ...[
               const SizedBox(height: 14),
-              FilledButton.tonal(onPressed: onRetry, child: const Text('Retry')),
+              FilledButton.tonal(
+                  onPressed: onRetry, child: const Text('Retry')),
             ],
           ],
         ),

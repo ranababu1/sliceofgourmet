@@ -98,7 +98,8 @@ void main() {
       final r = await sync.sync();
       expect((r.added, r.updated, r.removed), (1, 1, 1));
       final list = site.requests
-          .where((u) => u.path == '/wp-json/sog/v1/recipes' &&
+          .where((u) =>
+              u.path == '/wp-json/sog/v1/recipes' &&
               u.queryParameters['category'] == null)
           .single;
       expect(list.queryParameters['modified_after'], '2026-11-20T09:59:59');
@@ -154,8 +155,8 @@ void main() {
   test('non-recipe links are ignored', () async {
     expect(await repo.resolveLink(Uri.parse('https://sliceofgourmet.com/faq/')),
         isNull);
-    expect(await repo.resolveLink(Uri.parse('https://example.com/a/b/')),
-        isNull);
+    expect(
+        await repo.resolveLink(Uri.parse('https://example.com/a/b/')), isNull);
   });
 
   group('controller', () {

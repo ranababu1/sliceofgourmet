@@ -59,8 +59,11 @@ class FakeRecipeRepository implements RecipeRepository {
 }
 
 class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository({this.user});
+  FakeAuthRepository({this.user, this.isAvailable = true});
   AppUser? user;
+
+  @override
+  final bool isAvailable;
 
   @override
   Future<AppUser?> getCurrentUser() async => user;

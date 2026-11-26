@@ -158,7 +158,8 @@ class _HeartButtonState extends State<HeartButton>
   late final Animation<double> _pop = TweenSequence<double>([
     TweenSequenceItem(tween: Tween<double>(begin: 1.0, end: 1.32), weight: 35),
     TweenSequenceItem(
-        tween: Tween<double>(begin: 1.32, end: 1.0).chain(CurveTween(curve: Curves.elasticOut)),
+        tween: Tween<double>(begin: 1.32, end: 1.0)
+            .chain(CurveTween(curve: Curves.elasticOut)),
         weight: 65),
   ]).animate(_c);
 

@@ -94,8 +94,7 @@ class _LoadingDetail extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             sliver: SliverList.list(children: [
               if (c != null)
-                Text(c.title,
-                    style: Theme.of(context).textTheme.headlineMedium)
+                Text(c.title, style: Theme.of(context).textTheme.headlineMedium)
               else
                 const ShimmerBox(height: 28, width: 240),
               const SizedBox(height: 16),
@@ -154,7 +153,8 @@ class _RecipeDetailBodyState extends ConsumerState<_RecipeDetailBody> {
       if (times.length <= 1)
         if (formatMinutes(recipe.displayMinutes) case final t?)
           (Icons.schedule_rounded, 'Time', t),
-      if (recipe.servingsLabel case final s?) (Icons.people_alt_outlined, 'Serves', s),
+      if (recipe.servingsLabel case final s?)
+        (Icons.people_alt_outlined, 'Serves', s),
       if (recipe.difficultyLabel case final d?)
         (Icons.signal_cellular_alt_rounded, 'Level', d),
       if (recipe.caloriesLabel case final c?)
@@ -208,8 +208,8 @@ class _RecipeDetailBodyState extends ConsumerState<_RecipeDetailBody> {
               pinned: true,
               stretch: true,
               expandedHeight: hasPhoto ? _headerHeight : null,
-              leading: _CircleAction(
-                  hasPhoto: hasPhoto, child: const BackButton()),
+              leading:
+                  _CircleAction(hasPhoto: hasPhoto, child: const BackButton()),
               actions: actions,
               title: hasPhoto ? null : Text(recipe.title, maxLines: 1),
               flexibleSpace: hasPhoto
@@ -506,11 +506,11 @@ class _StepTile extends StatelessWidget {
             width: 30,
             height: 30,
             alignment: Alignment.center,
-            decoration:
-                BoxDecoration(color: cs.primaryContainer, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+                color: cs.primaryContainer, shape: BoxShape.circle),
             child: Text('$number',
-                style: TextStyle(
-                    color: cs.primary, fontWeight: FontWeight.w800)),
+                style:
+                    TextStyle(color: cs.primary, fontWeight: FontWeight.w800)),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -575,11 +575,11 @@ class _StatsRow extends StatelessWidget {
                     textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: text.labelLarge
-                        ?.copyWith(fontWeight: FontWeight.w700)),
+                    style:
+                        text.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
                 Text(s.$2,
-                    style: text.labelSmall
-                        ?.copyWith(color: cs.onSurfaceVariant)),
+                    style:
+                        text.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
               ]),
             ),
         ],
@@ -603,7 +603,8 @@ class _TimesRow extends StatelessWidget {
           Column(
             children: [
               Text(t.$1,
-                  style: text.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
+                  style:
+                      text.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
               const SizedBox(height: 2),
               Text(t.$2,
                   style:

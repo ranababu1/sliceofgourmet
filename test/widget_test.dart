@@ -34,10 +34,11 @@ class FakeSync extends RecipeSync {
   }
 }
 
-Widget _app(FakeSync sync) => ProviderScope(
+Widget _app(FakeSync sync, {bool signIn = true}) => ProviderScope(
       overrides: [
         recipeRepositoryProvider.overrideWithValue(FakeRecipeRepository()),
-        authRepositoryProvider.overrideWithValue(FakeAuthRepository()),
+        authRepositoryProvider
+            .overrideWithValue(FakeAuthRepository(isAvailable: signIn)),
         recipeSyncProvider.overrideWithValue(sync),
       ],
       child: const SliceOfGourmetApp(),
@@ -54,8 +55,7 @@ void main() {
     await LocalStore.instance.clear();
   });
 
-  testWidgets('home shows cached recipes and a refresh button',
-      (tester) async {
+  testWidgets('home shows cached recipes and a refresh button', (tester) async {
     await LocalStore.instance.setCatalogIds(['0', '1', '2']);
     await LocalStore.instance.setLastSyncedAt(DateTime.now());
     final sync = FakeSync(LocalStore.instance);
@@ -119,5 +119,18 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('Continue with Google'), findsOneWidget);
+  });
+
+  testWidgets('without sign-in configured, tabs open directly', (tester) async {
+    await LocalStore.instance.setCatalogIds(['0']);
+    await LocalStore.instance.setLastSyncedAt(DateTime.now());
+    await tester.pumpWidget(_app(FakeSync(LocalStore.instance), signIn: false));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.bySemanticsLabel('Profile'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('Continue with Google'), findsNothing);
+    expect(find.text('Refresh recipes'), findsOneWidget);
   });
 }

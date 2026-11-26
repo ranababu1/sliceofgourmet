@@ -61,7 +61,10 @@ class WordPressRecipeRepository implements RecipeRepository {
 
   Future<List<Recipe>> _network(Future<ApiPage> call) async {
     final res = await call;
-    return res.items.map(Recipe.fromJson).where((r) => r.id.isNotEmpty).toList();
+    return res.items
+        .map(Recipe.fromJson)
+        .where((r) => r.id.isNotEmpty)
+        .toList();
   }
 
   @override
@@ -73,8 +76,7 @@ class WordPressRecipeRepository implements RecipeRepository {
   @override
   Future<List<Recipe>> fetchTrending({int limit = 10}) async {
     if (!store.hasCatalog) {
-      return _network(
-          api.fetchRecipes(perPage: limit, category: 'featured'));
+      return _network(api.fetchRecipes(perPage: limit, category: 'featured'));
     }
     final ids = store.trendingIds ?? const <String>[];
     final featured = [
@@ -145,8 +147,9 @@ class WordPressRecipeRepository implements RecipeRepository {
     final out = <RecipeCategory>[];
     for (final c in visible) {
       final ids = _withDescendants(c.id, cats);
-      final n =
-          catalog.where((r) => r.categories.any((t) => ids.contains(t.id))).length;
+      final n = catalog
+          .where((r) => r.categories.any((t) => ids.contains(t.id)))
+          .length;
       if (n > 0) {
         out.add(RecipeCategory(
             id: c.id, name: c.name, slug: c.slug, parent: c.parent, count: n));

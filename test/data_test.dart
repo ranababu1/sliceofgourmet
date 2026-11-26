@@ -98,11 +98,14 @@ void main() {
     });
 
     test('messages', () {
-      expect(refreshMessage(const RefreshTooSoon(Duration(minutes: 11, seconds: 5))),
+      expect(
+          refreshMessage(
+              const RefreshTooSoon(Duration(minutes: 11, seconds: 5))),
           'You are up to date. You can refresh again in 12 minutes.');
       expect(refreshMessage(const RefreshDone(SyncReport())),
           'You have the latest recipes.');
-      expect(refreshMessage(const RefreshDone(SyncReport(added: 2, removed: 1))),
+      expect(
+          refreshMessage(const RefreshDone(SyncReport(added: 2, removed: 1))),
           'Recipes refreshed: 2 new, 1 removed.');
       expect(refreshMessage(const RefreshTooSoon(Duration(seconds: 20))),
           contains('1 minute.'));

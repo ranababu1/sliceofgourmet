@@ -81,9 +81,8 @@ class MockRecipeRepository implements RecipeRepository {
   }
 
   @override
-  Future<List<Recipe>> fetchByCategory(int categoryId) async => _items
-      .where((e) => e.categories.any((c) => c.id == categoryId))
-      .toList();
+  Future<List<Recipe>> fetchByCategory(int categoryId) async =>
+      _items.where((e) => e.categories.any((c) => c.id == categoryId)).toList();
 
   @override
   Future<String?> resolveLink(Uri link) async {
