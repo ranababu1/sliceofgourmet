@@ -1,0 +1,6 @@
+# Copy to android/key.properties (gitignored) and fill in. Never commit the real file.
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=upload
+# Path is relative to android/app/, or absolute.
+storeFile=/Users/imran/keys/sliceofgourmet-upload.jks
