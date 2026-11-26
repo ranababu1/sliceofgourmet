@@ -7,14 +7,14 @@ import 'data/category.dart';
 import '../../core/cache/local_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const _baseUrl = 'https://sliceofgourmet.com';
+const kSiteBaseUrl = 'https://sliceofgourmet.com';
 
-final _apiProvider = Provider<SogApi>((ref) => SogApi(_baseUrl));
-final _storeProvider = Provider<LocalStore>((ref) => LocalStore.instance);
+final sogApiProvider = Provider<SogApi>((ref) => SogApi(kSiteBaseUrl));
+final localStoreProvider = Provider<LocalStore>((ref) => LocalStore.instance);
 
 final recipeRepositoryProvider = Provider<RecipeRepository>((ref) {
   return WordPressRecipeRepository(
-      ref.read(_apiProvider), ref.read(_storeProvider));
+      ref.read(sogApiProvider), ref.read(localStoreProvider));
 });
 
 /// Full recipe for the detail screen.
@@ -29,22 +29,25 @@ final trendingRecipesProvider = FutureProvider<List<Recipe>>((ref) async {
   return repo.fetchTrending(limit: 10);
 });
 
-final latestRecipesProvider =
-    FutureProvider.family<List<Recipe>, int>((ref, page) async {
+final latestRecipesProvider = FutureProvider<List<Recipe>>((ref) async {
   final repo = ref.watch(recipeRepositoryProvider);
-  return repo.fetchLatest(page: page, pageSize: 20);
+  return repo.fetchLatest(limit: 20);
 });
 
 final categoriesProvider = FutureProvider<List<RecipeCategory>>((ref) async {
   final repo = ref.watch(recipeRepositoryProvider);
-  final all = await repo.fetchCategories();
-  all.sort((a, b) => b.count.compareTo(a.count));
-  return all;
+  return repo.fetchCategories();
 });
 
 final topCategoriesProvider = FutureProvider<List<RecipeCategory>>((ref) async {
   final list = await ref.watch(categoriesProvider.future);
   return list.take(5).toList(growable: false);
+});
+
+final categoryRecipesProvider =
+    FutureProvider.family<List<Recipe>, int>((ref, id) async {
+  final repo = ref.watch(recipeRepositoryProvider);
+  return repo.fetchByCategory(id);
 });
 
 final searchResultsProvider =
@@ -81,6 +84,7 @@ class BookmarkIdsNotifier extends StateNotifier<Set<String>> {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     var ids = prefs.getStringList(_bookmarksKey) ?? [];
     if (prefs.getInt(_bookmarksVersionKey) != 2) {
       // drop anything that is not a numeric post id
@@ -88,6 +92,7 @@ class BookmarkIdsNotifier extends StateNotifier<Set<String>> {
       await prefs.setStringList(_bookmarksKey, ids);
       await prefs.setInt(_bookmarksVersionKey, 2);
     }
+    if (!mounted) return;
     // keep anything toggled before loading finished
     state = {...ids, ...state};
   }
@@ -137,7 +142,11 @@ final bookmarkedRecipesProvider =
   final ids = ref.watch(bookmarksProvider);
   final gone = <String>{};
   var failed = 0;
+  final store = ref.read(localStoreProvider);
   final results = await Future.wait(ids.map((id) async {
+    // the synced catalog already has the card, no request needed
+    final card = store.readCard(id);
+    if (card != null) return Recipe.fromJson(card);
     try {
       return await repo.fetchById(id);
     } on RecipeNotFoundException {

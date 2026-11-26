@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Centered message with an optional retry button.
+/// Centered message with an icon in a soft circle and an optional retry.
 class MessageView extends StatelessWidget {
   const MessageView({
     super.key,
@@ -15,17 +15,25 @@ class MessageView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 40, color: Theme.of(context).colorScheme.outline),
-            const SizedBox(height: 12),
-            Text(message, textAlign: TextAlign.center),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                  color: cs.primaryContainer, shape: BoxShape.circle),
+              child: Icon(icon, size: 30, color: cs.primary),
+            ),
+            const SizedBox(height: 14),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: cs.onSurfaceVariant, height: 1.4)),
             if (onRetry != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               FilledButton.tonal(onPressed: onRetry, child: const Text('Retry')),
             ],
           ],

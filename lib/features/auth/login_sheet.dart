@@ -80,7 +80,7 @@ class _LoginSheetState extends ConsumerState<LoginSheet> {
                       .read(analyticsConsentProvider.notifier)
                       .set(v ?? false),
               title: const Text(
-                  'Share my name, email and device model with Slice Of Gourmet when I sign up (optional)'),
+                  'Share my name, email and device model with Slice of Gourmet when I sign up (optional)'),
               subtitle: Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton(

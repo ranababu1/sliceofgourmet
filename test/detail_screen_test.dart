@@ -15,8 +15,7 @@ import 'fixture.dart';
 
 class _FixtureRepo extends FakeRecipeRepository {
   @override
-  Future<RecipeDetail> fetchById(String id,
-          {bool forceRefresh = false}) async =>
+  Future<RecipeDetail> fetchById(String id) async =>
       RecipeDetail.fromJson(fixtureMap('recipe_$id.json'));
 }
 
@@ -32,7 +31,7 @@ Future<void> _pump(WidgetTester tester, String id) async {
 void main() {
   setUpAll(() async {
     Hive.init(Directory.systemTemp.createTempSync('sog_detail').path);
-    await LocalStore.init();
+    await LocalStore.init(inMemory: true);
   });
   setUp(() => SharedPreferences.setMockInitialValues({}));
 

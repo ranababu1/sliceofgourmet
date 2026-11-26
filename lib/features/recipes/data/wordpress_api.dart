@@ -24,6 +24,42 @@ class RecipeNotFoundException implements Exception {
   String toString() => 'Recipe $id not found';
 }
 
+/// Result of a conditional GET. [data] is null when the server answered
+/// 304 Not Modified for the ETag we sent.
+class Fetched<T> {
+  const Fetched(this.data, this.etag);
+  final T? data;
+  final String? etag;
+  bool get notModified => data == null;
+}
+
+/// One row of `GET sog/v1/recipes/ids`.
+class RemoteId {
+  const RemoteId(this.id, this.modifiedGmt);
+  final String id;
+  final String modifiedGmt;
+}
+
+/// Tiny `GET sog/v1/manifest` summary.
+class Manifest {
+  const Manifest(
+      {required this.count,
+      required this.idsEtag,
+      required this.categoriesEtag,
+      this.minSyncMinutes = 0});
+  final int count;
+  final String idsEtag;
+  final String categoriesEtag;
+  final int minSyncMinutes;
+
+  factory Manifest.fromJson(Map<String, dynamic> j) => Manifest(
+        count: (j['count'] as num?)?.toInt() ?? 0,
+        idsEtag: '${j['ids_etag'] ?? ''}',
+        categoriesEtag: '${j['categories_etag'] ?? ''}',
+        minSyncMinutes: (j['min_sync_minutes'] as num?)?.toInt() ?? 0,
+      );
+}
+
 class ApiException implements Exception {
   ApiException(this.label, this.statusCode);
   final String label;
@@ -41,7 +77,10 @@ class SogApi {
   final http.Client client;
   final Duration timeout;
 
-  static const _headers = {'Accept': 'application/json'};
+  static const _headers = {
+    'Accept': 'application/json',
+    'User-Agent': 'SliceOfGourmetApp/1.1',
+  };
 
   Uri _u(String path, [Map<String, Object?>? q]) {
     final query = <String, String>{};
@@ -52,8 +91,12 @@ class SogApi {
         .replace(path: path, queryParameters: query.isEmpty ? null : query);
   }
 
-  Future<http.Response> _get(Uri uri) =>
-      client.get(uri, headers: _headers).timeout(timeout);
+  Future<http.Response> _get(Uri uri, {String? etag}) => client
+      .get(uri,
+          headers: etag == null || etag.isEmpty
+              ? _headers
+              : {..._headers, 'If-None-Match': etag})
+      .timeout(timeout);
 
   static bool _isPastLastPage(http.Response res) {
     if (res.statusCode != 400) return false;
@@ -84,8 +127,10 @@ class SogApi {
     String? category,
     String orderby = 'date',
     String order = 'desc',
+    String? modifiedAfter,
   }) async {
     final res = await _get(_u('/wp-json/sog/v1/recipes', {
+      'modified_after': modifiedAfter,
       'page': page,
       'per_page': perPage.clamp(1, 100),
       'search': search,
@@ -113,11 +158,30 @@ class SogApi {
     return Map<String, dynamic>.from(j);
   }
 
-  /// `GET sog/v1/recipes/ids`: every published recipe id.
-  Future<Set<String>> fetchRecipeIds() async {
-    final res = await _get(_u('/wp-json/sog/v1/recipes/ids'));
+  /// `GET sog/v1/recipes/ids`: every published recipe id with its modified
+  /// time, newest first. Conditional on [etag].
+  Future<Fetched<List<RemoteId>>> fetchIds({String? etag}) async {
+    final res = await _get(_u('/wp-json/sog/v1/recipes/ids'), etag: etag);
+    if (res.statusCode == 304) return Fetched(null, etag);
     if (res.statusCode != 200) throw ApiException('ids', res.statusCode);
-    return _list(res.body).map((e) => '${e['id']}').toSet();
+    final ids = _list(res.body)
+        .map((e) => RemoteId('${e['id']}', '${e['modified_gmt'] ?? ''}'))
+        .where((e) => int.tryParse(e.id) != null)
+        .toList();
+    return Fetched(ids, res.headers['etag']);
+  }
+
+  /// `GET sog/v1/manifest`, conditional on [etag]. Null when the site has
+  /// no manifest route (older plugin); callers fall back to the id list.
+  Future<Fetched<Manifest>?> fetchManifest({String? etag}) async {
+    final res = await _get(_u('/wp-json/sog/v1/manifest'), etag: etag);
+    if (res.statusCode == 304) return Fetched(null, etag);
+    if (res.statusCode == 404) return null;
+    if (res.statusCode != 200) throw ApiException('manifest', res.statusCode);
+    final j = jsonDecode(res.body);
+    if (j is! Map) throw ApiException('manifest', res.statusCode);
+    return Fetched(
+        Manifest.fromJson(Map<String, dynamic>.from(j)), res.headers['etag']);
   }
 
   /// Non-empty post categories.

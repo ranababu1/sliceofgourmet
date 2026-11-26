@@ -1,30 +1,37 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:hive_flutter/hive_flutter.dart';
 
-/// Simple local cache built on Hive.
+/// Local cache built on Hive. The app keeps the whole recipe catalog on the
+/// device and only syncs what changed, so screens never wait on the network.
+///
 /// Boxes:
 /// - posts: `card_<id>` list item json, `post_<id>` full recipe json, both in
 ///   the sog/v1 server shape
-/// - lists: lists of ids, example `latest_page_1` => [1,2,3]
-/// - meta: schema, lastHydratedAt (ISO), categories_json
+/// - lists: ordered id lists (`catalog_ids`, `trending_ids`)
+/// - meta: schema, sync times, ETags, categories json
 class LocalStore {
   static late Box _posts;
   static late Box _lists;
   static late Box _meta;
 
   /// Bump when the cached json shape changes. v1 held parsed WPRM/HTML
-  /// recipes from wp/v2/posts; v2 holds sog/v1 responses.
-  static const int schemaVersion = 2;
+  /// recipes, v2 per-page sog/v1 lists, v3 the full local catalog.
+  static const int schemaVersion = 3;
 
-  static Future<void> init() async {
-    _posts = await Hive.openBox('posts');
-    _lists = await Hive.openBox('lists');
-    _meta = await Hive.openBox('meta');
+  /// [inMemory] keeps everything in RAM (widget tests).
+  static Future<void> init({bool inMemory = false}) async {
+    Future<Box> open(String name) => inMemory
+        ? Hive.openBox(name, bytes: Uint8List(0))
+        : Hive.openBox(name);
+    _posts = await open('posts');
+    _lists = await open('lists');
+    _meta = await open('meta');
     await _migrate();
   }
 
   /// Drops caches written by older app versions. They are only a cache and
-  /// are refilled from the network on the next load.
+  /// are refilled from the network by the next sync.
   static Future<void> _migrate() async {
     if (_meta.get('schema') == schemaVersion) return;
     await _posts.clear();
@@ -34,6 +41,14 @@ class LocalStore {
   }
 
   static LocalStore get instance => LocalStore();
+
+  /// Wipes everything (tests and "clear cache").
+  Future<void> clear() async {
+    await _posts.clear();
+    await _lists.clear();
+    await _meta.clear();
+    await _meta.put('schema', schemaVersion);
+  }
 
   Map<String, dynamic>? _read(String key) {
     try {
@@ -54,18 +69,27 @@ class LocalStore {
   Future<void> writePost(String id, Map<String, dynamic> json) =>
       _posts.put('post_$id', jsonEncode(json));
 
+  Future<void> deletePost(String id) => _posts.delete('post_$id');
+
   // list cards
   Map<String, dynamic>? readCard(String id) => _read('card_$id');
 
   Future<void> writeCard(String id, Map<String, dynamic> json) =>
       _posts.put('card_$id', jsonEncode(json));
 
+  Future<void> writeCards(Map<String, Map<String, dynamic>> cards) =>
+      _posts.putAll(cards.map((id, j) => MapEntry('card_$id', jsonEncode(j))));
+
   Future<void> deleteRecipe(String id) async {
     await _posts.delete('post_$id');
     await _posts.delete('card_$id');
+    final ids = catalogIds;
+    if (ids != null && ids.contains(id)) {
+      await setCatalogIds(ids.where((e) => e != id).toList());
+    }
   }
 
-  // lists
+  // id lists
   List<String>? readIdList(String key) {
     final raw = _lists.get(key);
     if (raw is List) return raw.map((e) => '$e').toList();
@@ -75,24 +99,48 @@ class LocalStore {
   Future<void> writeIdList(String key, List<String> ids) =>
       _lists.put(key, ids);
 
-  // meta basics
-  DateTime? get lastHydratedAt {
-    final s = _meta.get('lastHydratedAt');
-    if (s is String) return DateTime.tryParse(s);
-    return null;
-  }
+  /// Every recipe id on the device, newest first. Null before the first sync.
+  List<String>? get catalogIds => readIdList('catalog_ids');
+  Future<void> setCatalogIds(List<String> ids) =>
+      writeIdList('catalog_ids', ids);
 
-  Future<void> setLastHydratedAt(DateTime dt) =>
-      _meta.put('lastHydratedAt', dt.toIso8601String());
+  bool get hasCatalog => catalogIds != null;
 
-  // trending and latest ids
   List<String>? get trendingIds => readIdList('trending_ids');
   Future<void> setTrendingIds(List<String> ids) =>
       writeIdList('trending_ids', ids);
 
-  List<String>? get latestPage1Ids => readIdList('latest_page_1');
-  Future<void> setLatestPage1Ids(List<String> ids) =>
-      writeIdList('latest_page_1', ids);
+  // meta
+  DateTime? _date(String key) {
+    final s = _meta.get(key);
+    return s is String ? DateTime.tryParse(s) : null;
+  }
+
+  Future<void> _setDate(String key, DateTime? dt) => dt == null
+      ? _meta.delete(key)
+      : _meta.put(key, dt.toUtc().toIso8601String());
+
+  /// Last successful sync with the site.
+  DateTime? get lastSyncedAt => _date('lastSyncedAt');
+  Future<void> setLastSyncedAt(DateTime dt) => _setDate('lastSyncedAt', dt);
+
+  /// Last refresh the user asked for (rate limit).
+  DateTime? get lastManualRefreshAt => _date('lastManualRefreshAt');
+  Future<void> setLastManualRefreshAt(DateTime dt) =>
+      _setDate('lastManualRefreshAt', dt);
+
+  /// Earliest time an automatic sync may run (error backoff).
+  DateTime? get nextAutoSyncAt => _date('nextAutoSyncAt');
+  Future<void> setNextAutoSyncAt(DateTime? dt) => _setDate('nextAutoSyncAt', dt);
+
+  int get autoSyncFailures => (_meta.get('autoSyncFailures') as int?) ?? 0;
+  Future<void> setAutoSyncFailures(int n) => _meta.put('autoSyncFailures', n);
+
+  /// ETags of the last seen manifest, id list and categories.
+  String? etag(String name) => _meta.get('etag_$name') as String?;
+  Future<void> setEtag(String name, String? value) => value == null
+      ? _meta.delete('etag_$name')
+      : _meta.put('etag_$name', value);
 
   // categories list cache as JSON
   List<Map<String, dynamic>>? readCategories() {

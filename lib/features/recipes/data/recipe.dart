@@ -126,6 +126,19 @@ class RecipeImage {
   String get heroUrl =>
       sizes['large']?.url ?? sizes['medium_large']?.url ?? url;
 
+  /// URL at least [px] physical pixels wide. Images are served by the
+  /// Jetpack Photon CDN (i0.wp.com), which resizes on its edge, so the WP
+  /// server never sees image traffic. Widths snap to a few buckets so
+  /// every device asks for the same cached files.
+  String urlFor(double px) => photonResize(url, _bucket(px));
+
+  static int _bucket(double px) {
+    for (final b in const [320, 480, 720, 1080]) {
+      if (px <= b) return b;
+    }
+    return 1440;
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'url': url,
@@ -137,6 +150,18 @@ class RecipeImage {
           'sizes': sizes.map((k, s) => MapEntry(
               k, {'url': s.url, 'width': s.width, 'height': s.height})),
       };
+}
+
+/// Photon URL resized to [width] px wide; other URLs are returned as is.
+String photonResize(String url, int width) {
+  final u = Uri.tryParse(url);
+  if (u == null || !RegExp(r'^i[0-3]\.wp\.com$').hasMatch(u.host)) return url;
+  final q = Map<String, String>.from(u.queryParameters)
+    ..remove('fit')
+    ..remove('resize')
+    ..remove('h')
+    ..['w'] = '$width';
+  return u.replace(queryParameters: q).toString();
 }
 
 /// List item: post fields plus the light `recipe_card`.
@@ -194,6 +219,10 @@ class Recipe {
 
   /// Card sized image URL, empty when the recipe has no photo.
   String get imageUrl => image?.heroUrl ?? '';
+
+  /// Image URL for a box [logicalWidth] wide on a [dpr] screen.
+  String imageFor(double logicalWidth, double dpr) =>
+      image?.urlFor(logicalWidth * dpr) ?? '';
 
   /// First category name for chips, skipping the "Featured" bucket.
   String? get category {
