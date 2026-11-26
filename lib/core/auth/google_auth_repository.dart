@@ -1,18 +1,38 @@
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import 'app_user.dart';
+import 'auth_config.dart';
 import 'auth_repository.dart';
 import '../analytics/sheets_logger.dart';
 
 class GoogleAuthRepository implements AuthRepository {
-  GoogleAuthRepository({GoogleSignIn? signIn, SheetsLogger? logger})
-      : _signIn = signIn ?? GoogleSignIn(scopes: const <String>['email']),
+  GoogleAuthRepository(
+      {GoogleSignIn? signIn, SheetsLogger? logger, bool? available})
+      : isAvailable = available ?? googleSignInAvailable(),
+        _signInOverride = signIn,
         _logger = logger ?? SheetsLogger();
 
-  final GoogleSignIn _signIn;
+  @override
+  final bool isAvailable;
+
+  final GoogleSignIn? _signInOverride;
   final SheetsLogger _logger;
+
+  static const unavailableMessage =
+      'Google sign-in is not available in this version yet.';
+
+  // Created lazily so nothing touches the native SDK when sign-in is off.
+  late final GoogleSignIn _signIn = _signInOverride ??
+      GoogleSignIn(
+        scopes: const <String>['email'],
+        clientId: defaultTargetPlatform == TargetPlatform.iOS &&
+                kGoogleIosClientId.isNotEmpty
+            ? kGoogleIosClientId
+            : null,
+      );
 
   Future<String> _deviceName() async {
     final d = DeviceInfoPlugin();
@@ -39,6 +59,7 @@ class GoogleAuthRepository implements AuthRepository {
 
   @override
   Future<AppUser?> getCurrentUser() async {
+    if (!isAvailable) return null;
     try {
       final acc = await _signIn.signInSilently();
       return acc == null ? null : _toUser(acc);
@@ -64,6 +85,7 @@ class GoogleAuthRepository implements AuthRepository {
 
   @override
   Future<AppUser?> signInWithGoogle() async {
+    if (!isAvailable) throw const AuthException(unavailableMessage);
     GoogleSignInAccount? acc;
     try {
       acc = await _signIn.signIn();
@@ -84,6 +106,7 @@ class GoogleAuthRepository implements AuthRepository {
 
   @override
   Future<void> signOut() async {
+    if (!isAvailable) return;
     try {
       await _signIn.signOut();
     } catch (_) {}

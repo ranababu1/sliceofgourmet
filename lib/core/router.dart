@@ -39,7 +39,12 @@ GoRouter createRouter() {
             name: 'recipeDetail',
             pageBuilder: (context, state) {
               final id = state.pathParameters['id']!;
-              return MaterialPage(child: RecipeDetailScreen(recipeId: id));
+              return MaterialPage(
+                child: RecipeDetailScreen(
+                  recipeId: id,
+                  heroScope: state.uri.queryParameters['h'] ?? 'none',
+                ),
+              );
             },
           ),
           GoRoute(
@@ -73,7 +78,7 @@ GoRouter createRouter() {
         ],
       ),
     ],
-    errorBuilder: (context, state) =>
-        const Scaffold(body: Center(child: Text('Oops, something went wrong'))),
+    errorBuilder: (context, state) => const Scaffold(
+        body: Center(child: Text('Something went wrong. Please go back.'))),
   );
 }

@@ -9,6 +9,9 @@ class AuthException implements Exception {
 }
 
 abstract class AuthRepository {
+  /// False when sign-in is not configured for this platform.
+  bool get isAvailable;
+
   /// Returns null if the user cancelled. Throws [AuthException] on failure.
   Future<AppUser?> signInWithGoogle();
   Future<void> signOut();

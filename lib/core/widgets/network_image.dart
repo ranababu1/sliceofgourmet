@@ -1,6 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+/// Cached network image that decodes at the size it is shown, fades in,
+/// and falls back to a tidy placeholder.
 class AppNetworkImage extends StatelessWidget {
   final String url;
   final double? height;
@@ -8,52 +10,47 @@ class AppNetworkImage extends StatelessWidget {
   final BoxFit fit;
   final BorderRadius borderRadius;
 
+  /// Decode width in physical pixels. Saves memory on long lists.
+  final int? cacheWidth;
+
   const AppNetworkImage({
     super.key,
     required this.url,
     this.height,
     this.width,
     this.fit = BoxFit.cover,
-    this.borderRadius = const BorderRadius.all(Radius.circular(12)),
+    this.borderRadius = BorderRadius.zero,
+    this.cacheWidth,
   });
 
   @override
   Widget build(BuildContext context) {
-    final placeholderColor = Theme.of(
-      context,
-    ).colorScheme.surfaceContainerHighest;
-
-    if (url.isEmpty) {
-      return Container(
-        height: height,
-        width: width,
-        decoration: BoxDecoration(
-          color: placeholderColor,
-          borderRadius: borderRadius,
-        ),
-        alignment: Alignment.center,
-        child: Icon(
-          Icons.restaurant_menu_rounded,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-      );
-    }
-    return ClipRRect(
-      borderRadius: borderRadius,
-      child: CachedNetworkImage(
-        imageUrl: url,
-        height: height,
-        width: width,
-        fit: fit,
-        placeholder: (context, _) =>
-            Container(color: placeholderColor, height: height, width: width),
-        errorWidget: (context, _, __) => Container(
-          color: placeholderColor,
+    final cs = Theme.of(context).colorScheme;
+    Widget placeholder([IconData? icon]) => Container(
           height: height,
           width: width,
-          child: const Icon(Icons.image_not_supported_outlined),
-        ),
-      ),
-    );
+          color: cs.surfaceContainerHighest,
+          alignment: Alignment.center,
+          child: icon == null
+              ? null
+              : Icon(icon, color: cs.onSurfaceVariant.withValues(alpha: 0.6)),
+        );
+
+    final child = url.isEmpty
+        ? placeholder(Icons.restaurant_menu_rounded)
+        : CachedNetworkImage(
+            imageUrl: url,
+            height: height,
+            width: width,
+            fit: fit,
+            memCacheWidth: cacheWidth,
+            fadeInDuration: const Duration(milliseconds: 260),
+            fadeOutDuration: Duration.zero,
+            placeholder: (context, _) => placeholder(),
+            errorWidget: (context, _, __) =>
+                placeholder(Icons.image_not_supported_outlined),
+          );
+    if (borderRadius == BorderRadius.zero) return child;
+    return ClipRRect(borderRadius: borderRadius, child: child);
   }
 }

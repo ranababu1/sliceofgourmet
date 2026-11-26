@@ -21,49 +21,35 @@ RecipeDetail fakeRecipe(int i) => RecipeDetail(
       ],
     );
 
-/// Records forceRefresh flags; no network.
+/// No network.
 class FakeRecipeRepository implements RecipeRepository {
-  final forceFlags = <String, bool>{};
   Set<String> failingIds = {};
   Set<String> goneIds = {};
 
   @override
-  Future<RecipeDetail> fetchById(String id, {bool forceRefresh = false}) async {
+  Future<RecipeDetail> fetchById(String id) async {
     if (goneIds.contains(id)) throw RecipeNotFoundException(id);
     if (failingIds.contains(id)) throw Exception('offline');
     return fakeRecipe(int.parse(id));
   }
 
   @override
-  Future<List<RecipeCategory>> fetchCategories(
-      {bool forceRefresh = false}) async {
-    forceFlags['categories'] = forceRefresh;
-    return const [RecipeCategory(id: 1, name: 'Dinner', count: 3)];
-  }
+  Future<List<RecipeCategory>> fetchCategories() async =>
+      const [RecipeCategory(id: 1, name: 'Dinner', count: 3)];
 
   @override
-  Future<List<Recipe>> fetchLatest(
-      {int page = 1, int pageSize = 20, bool forceRefresh = false}) async {
-    forceFlags['latest'] = forceRefresh;
-    return List.generate(3, fakeRecipe);
-  }
+  Future<List<Recipe>> fetchLatest({int limit = 20}) async =>
+      List.generate(3, fakeRecipe);
 
   @override
-  Future<List<Recipe>> fetchTrending(
-      {int limit = 10, bool forceRefresh = false}) async {
-    forceFlags['trending'] = forceRefresh;
-    return List.generate(2, fakeRecipe);
-  }
+  Future<List<Recipe>> fetchTrending({int limit = 10}) async =>
+      List.generate(2, fakeRecipe);
 
   @override
-  Future<List<Recipe>> search(String query,
-          {int page = 1, int pageSize = 20}) async =>
-      [];
+  Future<List<Recipe>> search(String query) async => [];
 
   @override
-  Future<List<Recipe>> fetchByCategory(int categoryId,
-          {int page = 1, int pageSize = 20}) async =>
-      [];
+  Future<List<Recipe>> fetchByCategory(int categoryId) async => [];
 
   @override
   Future<String?> resolveLink(Uri link) async =>
@@ -73,8 +59,11 @@ class FakeRecipeRepository implements RecipeRepository {
 }
 
 class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository({this.user});
+  FakeAuthRepository({this.user, this.isAvailable = true});
   AppUser? user;
+
+  @override
+  final bool isAvailable;
 
   @override
   Future<AppUser?> getCurrentUser() async => user;

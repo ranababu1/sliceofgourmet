@@ -1,18 +1,49 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../recipes/providers.dart';
-import '../../recipes/data/recipe.dart';
-import '../../../core/widgets/network_image.dart';
-import '../../../core/widgets/skeletons.dart';
-import '../../../core/data_sync/hydrator.dart';
+import '../../recipes/data/category.dart';
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/data_sync/sync_controller.dart';
+import '../../../core/motion.dart';
+import '../../../core/theme.dart';
+import '../../../core/widgets/recipe_card.dart';
+import '../../../core/widgets/skeletons.dart';
+import '../../../core/widgets/state_views.dart';
 import '../../auth/login_sheet.dart';
 import 'search_delegate.dart';
 import 'categories_screen.dart';
 import 'bookmarks_screen.dart';
 import 'settings_screen.dart';
+
+/// Opens the sign-in sheet; [onOk] runs right away when already signed in,
+/// or when sign-in is not set up on this platform.
+Future<void> requireSignIn(
+    BuildContext context, WidgetRef ref, VoidCallback onOk) async {
+  if (ref.read(isSignedInProvider) || !ref.read(signInAvailableProvider)) {
+    onOk();
+    return;
+  }
+  await showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (_) => const LoginSheet(),
+  );
+}
+
+/// Runs a rate limited refresh and tells the user how it went.
+Future<void> refreshAndReport(BuildContext context, WidgetRef ref) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final out = await ref.read(syncControllerProvider.notifier).refresh();
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(refreshMessage(out))));
+}
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -21,10 +52,11 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with WidgetsBindingObserver {
   int _index = 0;
 
-  final _pages = const [
+  static const _pages = [
     _HomeTab(),
     CategoriesScreen(),
     BookmarksScreen(),
@@ -32,18 +64,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   ];
 
   Future<void> _selectTab(int i) async {
-    final signedIn = ref.read(isSignedInProvider);
-    if (i != 0 && !signedIn) {
-      await showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        builder: (_) => const LoginSheet(),
-      );
+    if (i == _index) return;
+    HapticFeedback.selectionClick();
+    if (i != 0) {
+      await requireSignIn(context, ref, () => setState(() => _index = i));
       return;
     }
     setState(() => _index = i);
@@ -52,9 +76,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) ref.read(hydratorProvider).ensureDailyHydration();
+      if (mounted) ref.read(syncControllerProvider.notifier).autoSync();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // a cheap, throttled check when the app comes back
+    if (state == AppLifecycleState.resumed) {
+      ref.read(syncControllerProvider.notifier).autoSync();
+    }
   }
 
   @override
@@ -63,549 +102,380 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.listen(authControllerProvider, (prev, next) {
       if (next == null && _index != 0) setState(() => _index = 0);
     });
+    final still = reduceMotion(context);
 
     return Scaffold(
       extendBody: true,
-      body: Stack(
-        children: [
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: _pages[_index],
+      body: AnimatedSwitcher(
+        duration: Duration(milliseconds: still ? 0 : 280),
+        switchInCurve: kEase,
+        switchOutCurve: Curves.easeIn,
+        transitionBuilder: (child, a) => FadeTransition(
+          opacity: a,
+          child: SlideTransition(
+            position: Tween(begin: const Offset(0, 0.015), end: Offset.zero)
+                .animate(a),
+            child: child,
           ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-              child: _BottomPillNav(index: _index, onChanged: _selectTab),
-            ),
-          ),
-        ],
+        ),
+        child: KeyedSubtree(key: ValueKey(_index), child: _pages[_index]),
+      ),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+        child: _PillNav(index: _index, onChanged: _selectTab),
       ),
     );
   }
 }
 
-class _BottomPillNav extends StatelessWidget {
+class _PillNav extends StatelessWidget {
+  const _PillNav({required this.index, required this.onChanged});
   final int index;
   final ValueChanged<int> onChanged;
-  const _BottomPillNav({required this.index, required this.onChanged});
+
+  static const _items = [
+    (Icons.home_rounded, Icons.home_outlined, 'Home'),
+    (Icons.grid_view_rounded, Icons.grid_view_outlined, 'Browse'),
+    (Icons.favorite_rounded, Icons.favorite_border_rounded, 'Saved'),
+    (Icons.person_rounded, Icons.person_outline_rounded, 'Profile'),
+  ];
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF212528),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
+        color: dark ? Brand.darkCream : Brand.ink,
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
+              color: Color(0x33000000), blurRadius: 24, offset: Offset(0, 10)),
         ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _NavIcon(
-              selected: index == 0,
-              icon: Icons.home_rounded,
-              onTap: () => onChanged(0)),
-          _NavIcon(
-              selected: index == 1,
-              icon: Icons.grid_view_rounded,
-              onTap: () => onChanged(1)),
-          _NavIcon(
-              selected: index == 2,
-              icon: Icons.favorite_rounded,
-              onTap: () => onChanged(2)),
-          _NavIcon(
-              selected: index == 3,
-              icon: Icons.settings_rounded,
-              onTap: () => onChanged(3)),
+          for (var i = 0; i < _items.length; i++)
+            _PillNavItem(
+              selected: i == index,
+              icon: i == index ? _items[i].$1 : _items[i].$2,
+              label: _items[i].$3,
+              color: cs.primary,
+              onTap: () => onChanged(i),
+            ),
         ],
       ),
     );
   }
 }
 
-class _NavIcon extends StatelessWidget {
+class _PillNavItem extends StatelessWidget {
+  const _PillNavItem({
+    required this.selected,
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
   final bool selected;
   final IconData icon;
+  final String label;
+  final Color color;
   final VoidCallback onTap;
-  const _NavIcon(
-      {required this.selected, required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(22),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: selected
-              ? Colors.white.withValues(alpha: 0.15)
-              : Colors.transparent,
-          shape: BoxShape.circle,
+    final d = Duration(milliseconds: reduceMotion(context) ? 0 : 260);
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: AnimatedContainer(
+          duration: d,
+          curve: kEase,
+          padding: EdgeInsets.symmetric(
+              horizontal: selected ? 16 : 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? color : Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon,
+                  size: 22, color: selected ? Colors.white : Colors.white70),
+              AnimatedSize(
+                duration: d,
+                curve: kEase,
+                child: selected
+                    ? Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Text(label,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700)),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
         ),
-        child: Icon(icon, size: 22, color: Colors.white),
       ),
     );
   }
+}
+
+String _greeting(DateTime now) {
+  final h = now.hour;
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
 }
 
 class _HomeTab extends ConsumerWidget {
   const _HomeTab();
 
-  IconData _categoryIcon(String name) {
-    final n = name.toLowerCase();
-    if (n.contains('main')) {
-      return Icons.restaurant_rounded;
-    }
-    if (n.contains('dinner')) {
-      return Icons.dinner_dining;
-    }
-    if (n.contains('lunch')) {
-      return Icons.lunch_dining;
-    }
-    if (n.contains('side')) {
-      return Icons.rice_bowl;
-    }
-    if (n.contains('brunch')) {
-      return Icons.brunch_dining;
-    }
-    if (n.contains('dessert')) {
-      return Icons.icecream;
-    }
-    if (n.contains('breakfast')) {
-      return Icons.free_breakfast;
-    }
-    if (n.contains('snack')) {
-      return Icons.fastfood_rounded;
-    }
-    if (n.contains('soup')) {
-      return Icons.ramen_dining;
-    }
-    if (n.contains('drink') || n.contains('smoothie')) {
-      return Icons.local_drink_rounded;
-    }
-    return Icons.restaurant_menu_rounded;
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
+    final sync = ref.watch(syncControllerProvider);
+    if (!sync.hasCatalog) return FirstRunView(state: sync);
+
     final user = ref.watch(authControllerProvider);
-
-    return SafeArea(
-      child: RefreshIndicator(
-        onRefresh: () async {
-          final ok = await ref.read(hydratorProvider).hydrate();
-          if (!ok && context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Could not refresh, showing saved recipes')));
-          }
-        },
-        child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-        children: [
-          Row(
-            children: [
-              _Avatar(
-                  photoUrl: user?.photoUrl,
-                  initials: user?.firstName.isNotEmpty == true
-                      ? user!.firstName[0]
-                      : 'S'),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  user == null ? 'Chef' : user.firstName,
-                  style:
-                      text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                ),
-              ),
-              IconButton(
-                  icon: const Icon(Icons.notifications_none_rounded),
-                  onPressed: () {},
-                  tooltip: 'Notifications'),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "What do you want to cook today?",
-            style: text.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800, color: cs.onSurface, height: 1.2),
-          ),
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: () async {
-              await showSearch<String?>(
-                context: context,
-                delegate: RecipeSearchDelegate(),
-              );
-            },
-            child: AbsorbPointer(
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'Search here',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  filled: true,
-                  fillColor: cs.surfaceContainerHighest,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          _TopCategoriesGrid(iconFor: _categoryIcon),
-          const SizedBox(height: 18),
-          Text('Trending Recipe',
-              style: text.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800, color: cs.onSurface)),
-          const SizedBox(height: 12),
-          const _TrendingCarousel(),
-          const SizedBox(height: 12),
-          Text('Latest',
-              style: text.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800, color: cs.onSurface)),
-          const SizedBox(height: 12),
-          const _LatestStrip(),
-        ],
-      ),
-      ),
-    );
-  }
-}
-
-class _Avatar extends StatelessWidget {
-  final String? photoUrl;
-  final String initials;
-  const _Avatar({required this.photoUrl, required this.initials});
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = Theme.of(context).colorScheme.primary.withValues(alpha: 0.15);
-    const radius = 18.0;
-
-    if (photoUrl != null && photoUrl!.isNotEmpty) {
-      return ClipOval(
-        child: SizedBox(
-          width: radius * 2,
-          height: radius * 2,
-          child: AppNetworkImage(url: photoUrl!, fit: BoxFit.cover),
-        ),
-      );
-    }
-
-    return CircleAvatar(
-        radius: radius,
-        backgroundColor: bg,
-        child: Text(initials,
-            style: const TextStyle(fontWeight: FontWeight.w700)));
-  }
-}
-
-class _TopCategoriesGrid extends ConsumerWidget {
-  final IconData Function(String) iconFor;
-  const _TopCategoriesGrid({required this.iconFor});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final asyncTop = ref.watch(topCategoriesProvider);
-    final cs = Theme.of(context).colorScheme;
-    final isSignedIn = ref.watch(isSignedInProvider);
-
-    Future<void> requireAuth(BuildContext ctx, VoidCallback onOk) async {
-      if (isSignedIn) {
-        onOk();
-      } else {
-        await showModalBottomSheet(
-          context: ctx,
-          isScrollControlled: true,
-          useSafeArea: true,
-          backgroundColor: Theme.of(ctx).colorScheme.surface,
-          shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-          builder: (_) => const LoginSheet(),
-        );
-      }
-    }
-
-    return asyncTop.when(
-      loading: () => GridView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        shrinkWrap: true,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          childAspectRatio: 1.05,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-        ),
-        itemCount: 6,
-        itemBuilder: (_, __) => Container(
-          decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(18)),
-        ),
-      ),
-      error: (e, st) => const SizedBox.shrink(),
-      data: (top) {
-        final tiles = <Widget>[];
-        for (final c in top) {
-          tiles.add(
-            Material(
-              color: cs.surface,
-              borderRadius: BorderRadius.circular(18),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(18),
-                onTap: () => requireAuth(
-                    context,
-                    () => context.push(
-                        '/category/${c.id}?name=${Uri.encodeComponent(c.name)}')),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(iconFor(c.name), color: const Color(0xFF2F855A)),
-                      const SizedBox(height: 8),
-                      Text(c.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 2),
-                      Text('${c.count} recipes',
-                          style: TextStyle(
-                              fontSize: 11, color: cs.onSurfaceVariant)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-        tiles.add(
-          Material(
-            color: cs.primary.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(18),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(18),
-              onTap: () =>
-                  requireAuth(context, () => context.push('/categories')),
-              child: const Center(
-                child: Text('More',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w700, color: Color(0xFF2F855A))),
-              ),
-            ),
-          ),
-        );
-        return GridView.count(
-          physics: const NeverScrollableScrollPhysics(),
-          shrinkWrap: true,
-          crossAxisCount: 3,
-          childAspectRatio: 1.05,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          children: tiles,
-        );
-      },
-    );
-  }
-}
-
-class _TrendingCarousel extends ConsumerWidget {
-  const _TrendingCarousel();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final page = ref.watch(trendingRecipesProvider);
-    final bookmarks = ref.watch(bookmarksProvider);
-
-    return page.when(
-      loading: () => SizedBox(
-        height: 260,
-        child: PageView.builder(
-          controller: PageController(viewportFraction: 0.85),
-          itemBuilder: (_, __) => const Padding(
-              padding: EdgeInsets.only(right: 12), child: ShimmerCardLarge()),
-          itemCount: 3,
-        ),
-      ),
-      error: (e, st) => const SizedBox(
-          height: 60, child: Center(child: Text('Could not load trending'))),
-      data: (items) {
-        return SizedBox(
-          height: 260,
-          child: PageView.builder(
-            controller: PageController(viewportFraction: 0.85),
-            itemCount: items.length.clamp(0, 10),
-            itemBuilder: (context, index) {
-              final r = items[index];
-              final saved = bookmarks.contains(r.id);
-              return Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: _TrendingCard(
-                  recipe: r,
-                  saved: saved,
-                  onToggleSave: () => ref
-                      .read(bookmarkIdsNotifierProvider.notifier)
-                      .toggle(r.id),
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _TrendingCard extends StatelessWidget {
-  final Recipe recipe;
-  final bool saved;
-  final VoidCallback onToggleSave;
-
-  const _TrendingCard(
-      {required this.recipe, required this.saved, required this.onToggleSave});
-
-  @override
-  Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
 
-    return GestureDetector(
-      onTap: () => context.push('/recipe/${recipe.id}'),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          children: [
-            Positioned.fill(
-                child:
-                    AppNetworkImage(url: recipe.imageUrl, fit: BoxFit.cover)),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(14, 40, 14, 12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.25),
-                        Colors.black.withValues(alpha: 0.55),
-                      ]),
-                ),
+    return RefreshIndicator(
+      color: cs.primary,
+      onRefresh: () => refreshAndReport(context, ref),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverSafeArea(
+            bottom: false,
+            sliver: SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
+              sliver: SliverToBoxAdapter(
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        recipe.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: text.titleMedium?.copyWith(
-                            color: Colors.white, fontWeight: FontWeight.w700),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user == null
+                                ? _greeting(DateTime.now())
+                                : '${_greeting(DateTime.now())}, ${user.firstName}',
+                            style: text.labelLarge
+                                ?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: 4),
+                          Text('What are we\ncooking today?',
+                              style: text.headlineMedium),
+                        ],
                       ),
                     ),
-                    if (formatMinutesShort(recipe.displayMinutes)
-                        case final mins?) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.55),
-                            borderRadius: BorderRadius.circular(16)),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.timer_outlined,
-                                size: 16, color: Colors.white),
-                            const SizedBox(width: 4),
-                            Text(mins,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
-                    ],
+                    RefreshButton(syncing: sync.syncing),
                   ],
                 ),
               ),
             ),
-            Positioned(
-              top: 12,
-              right: 12,
-              child: InkWell(
-                onTap: onToggleSave,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                      color: Colors.white, shape: BoxShape.circle),
-                  child: Icon(
-                      saved
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
-                      color: saved ? Colors.red : Colors.black87,
-                      size: 22),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 18)),
+          const SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            sliver: SliverToBoxAdapter(child: _SearchPill()),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 18)),
+          const SliverToBoxAdapter(child: _CategoryChips()),
+          const SliverToBoxAdapter(child: SizedBox(height: 22)),
+          const _SectionTitle('Trending now'),
+          const SliverToBoxAdapter(child: _TrendingCarousel()),
+          const SliverToBoxAdapter(child: SizedBox(height: 26)),
+          const _SectionTitle('Fresh from the kitchen'),
+          const _LatestGrid(),
+          const SliverToBoxAdapter(child: SizedBox(height: 120)),
+        ],
       ),
     );
   }
 }
 
-class _LatestStrip extends ConsumerWidget {
-  const _LatestStrip();
+/// Spins while a sync runs. Tapping it is rate limited.
+class RefreshButton extends ConsumerStatefulWidget {
+  const RefreshButton({super.key, required this.syncing});
+  final bool syncing;
+
+  @override
+  ConsumerState<RefreshButton> createState() => _RefreshButtonState();
+}
+
+class _RefreshButtonState extends ConsumerState<RefreshButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _spin = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 900));
+
+  @override
+  void didUpdateWidget(RefreshButton old) {
+    super.didUpdateWidget(old);
+    _sync();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _sync();
+  }
+
+  void _sync() {
+    if (widget.syncing && !reduceMotion(context)) {
+      if (!_spin.isAnimating) _spin.repeat();
+    } else if (_spin.isAnimating) {
+      _spin.forward(from: _spin.value).then((_) => _spin.reset());
+    }
+  }
+
+  @override
+  void dispose() {
+    _spin.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return IconButton.filledTonal(
+      tooltip: 'Refresh recipes',
+      onPressed: widget.syncing ? null : () => refreshAndReport(context, ref),
+      icon: RotationTransition(
+        turns: _spin,
+        child: Icon(Icons.refresh_rounded, color: cs.primary),
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.title);
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      sliver: SliverToBoxAdapter(
+        child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+      ),
+    );
+  }
+}
+
+class _SearchPill extends StatelessWidget {
+  const _SearchPill();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Pressable(
+      semanticLabel: 'Search recipes',
+      onTap: () => showSearch<String?>(
+          context: context, delegate: RecipeSearchDelegate()),
+      child: Container(
+        height: 54,
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainer,
+          borderRadius: BorderRadius.circular(27),
+          border: Border.all(color: cs.outlineVariant),
+        ),
+        child: Row(children: [
+          Icon(Icons.search_rounded, color: cs.onSurfaceVariant),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text('Search recipes, ingredients, cuisines',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: cs.onSurfaceVariant)),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+IconData categoryIcon(String name) {
+  final n = name.toLowerCase();
+  if (n.contains('dessert')) return Icons.icecream_outlined;
+  if (n.contains('soup')) return Icons.ramen_dining_outlined;
+  if (n.contains('salad')) return Icons.eco_outlined;
+  if (n.contains('bread')) return Icons.bakery_dining_outlined;
+  if (n.contains('brunch')) return Icons.brunch_dining_outlined;
+  if (n.contains('breakfast')) return Icons.free_breakfast_outlined;
+  if (n.contains('instant')) return Icons.soup_kitchen_outlined;
+  if (n.contains('appetizer') || n.contains('snack')) {
+    return Icons.tapas_outlined;
+  }
+  if (n.contains('condiment')) return Icons.local_dining_outlined;
+  if (n.contains('tea')) return Icons.emoji_food_beverage_outlined;
+  if (n.contains('lunch') || n.contains('dinner')) {
+    return Icons.dinner_dining_outlined;
+  }
+  if (n.contains('side')) return Icons.rice_bowl_outlined;
+  if (n.contains('diet') || n.contains('keto') || n.contains('gluten')) {
+    return Icons.spa_outlined;
+  }
+  if (n.contains('main')) return Icons.restaurant_outlined;
+  return Icons.restaurant_menu_rounded;
+}
+
+void openCategory(BuildContext context, RecipeCategory c) =>
+    context.push('/category/${c.id}?name=${Uri.encodeComponent(c.name)}');
+
+class _CategoryChips extends ConsumerWidget {
+  const _CategoryChips();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final list = ref.watch(latestRecipesProvider(1));
-    final bookmarks = ref.watch(bookmarksProvider);
-
+    final cats = ref.watch(categoriesProvider).valueOrNull;
+    final cs = Theme.of(context).colorScheme;
+    if (cats == null || cats.isEmpty) return const SizedBox(height: 44);
+    final top = cats.take(8).toList();
     return SizedBox(
-      height: 190,
-      child: list.when(
-        loading: () => ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: 4,
-          separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (_, __) => const ShimmerTileSmall(),
-        ),
-        error: (e, st) => const Center(child: Text('Could not load latest')),
-        data: (items) {
-          return ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: items.length.clamp(0, 20),
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final r = items[index];
-              final saved = bookmarks.contains(r.id);
-              return SizedBox(
-                width: 220,
-                child: _SmallCard(
-                    recipe: r,
-                    saved: saved,
-                    onToggleSave: () => ref
-                        .read(bookmarkIdsNotifierProvider.notifier)
-                        .toggle(r.id)),
-              );
-            },
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: top.length + 1,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          if (i == top.length) {
+            return FadeSlideIn(
+              index: i,
+              child: ActionChip(
+                avatar: Icon(Icons.arrow_forward_rounded,
+                    size: 18, color: cs.primary),
+                label: const Text('All'),
+                onPressed: () => requireSignIn(
+                    context, ref, () => context.push('/categories')),
+              ),
+            );
+          }
+          final c = top[i];
+          return FadeSlideIn(
+            index: i,
+            child: Pressable(
+              child: ActionChip(
+                avatar: Icon(categoryIcon(c.name), size: 18, color: cs.primary),
+                label: Text(c.name),
+                onPressed: () =>
+                    requireSignIn(context, ref, () => openCategory(context, c)),
+              ),
+            ),
           );
         },
       ),
@@ -613,69 +483,229 @@ class _LatestStrip extends ConsumerWidget {
   }
 }
 
-class _SmallCard extends StatelessWidget {
-  final Recipe recipe;
-  final bool saved;
-  final VoidCallback onToggleSave;
-  const _SmallCard(
-      {required this.recipe, required this.saved, required this.onToggleSave});
+class _TrendingCarousel extends ConsumerStatefulWidget {
+  const _TrendingCarousel();
+
+  @override
+  ConsumerState<_TrendingCarousel> createState() => _TrendingCarouselState();
+}
+
+class _TrendingCarouselState extends ConsumerState<_TrendingCarousel> {
+  final _controller = PageController(viewportFraction: 0.84);
+  double _page = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() {
+      if (_controller.hasClients) {
+        setState(() => _page = _controller.page ?? 0);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    return GestureDetector(
-      onTap: () => context.push('/recipe/${recipe.id}'),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: Stack(
-          children: [
-            Positioned.fill(
-                child:
-                    AppNetworkImage(url: recipe.imageUrl, fit: BoxFit.cover)),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(10, 36, 10, 8),
+    final async = ref.watch(trendingRecipesProvider);
+    final saved = ref.watch(bookmarksProvider);
+    final still = reduceMotion(context);
+    const height = 340.0;
+
+    return async.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20),
+        child: SizedBox(height: height, child: ShimmerCardLarge()),
+      ),
+      error: (e, st) => const SizedBox(
+          height: 80, child: MessageView(message: 'Could not load trending')),
+      data: (items) {
+        if (items.isEmpty) return const SizedBox.shrink();
+        return Column(children: [
+          SizedBox(
+            height: height,
+            child: PageView.builder(
+              controller: _controller,
+              padEnds: false,
+              itemCount: items.length,
+              itemBuilder: (context, i) {
+                final r = items[i];
+                final delta = (i - _page).abs().clamp(0.0, 1.0);
+                final scale = still ? 1.0 : 1 - delta * 0.06;
+                return Padding(
+                  padding: EdgeInsets.only(left: i == 0 ? 20 : 6, right: 6),
+                  child: Transform.scale(
+                    scale: scale,
+                    child: FadeSlideIn(
+                      index: i,
+                      child: FeatureCard(
+                        recipe: r,
+                        heroScope: 'trending',
+                        saved: saved.contains(r.id),
+                        onToggleSave: () => ref
+                            .read(bookmarkIdsNotifierProvider.notifier)
+                            .toggle(r.id),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+          _Dots(count: items.length, page: _page),
+        ]);
+      },
+    );
+  }
+}
+
+class _Dots extends StatelessWidget {
+  const _Dots({required this.count, required this.page});
+  final int count;
+  final double page;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return ExcludeSemantics(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (var i = 0; i < count; i++)
+            Builder(builder: (_) {
+              final double t = 1 - math.min(1.0, (i - page).abs()).toDouble();
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                height: 6,
+                width: 6 + 14 * t,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.25),
-                        Colors.black.withValues(alpha: 0.60),
-                      ]),
+                  color: Color.lerp(cs.outlineVariant, cs.primary, t),
+                  borderRadius: BorderRadius.circular(3),
                 ),
-                child: Text(
-                  recipe.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: text.bodyMedium?.copyWith(
-                      color: Colors.white, fontWeight: FontWeight.w700),
-                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+}
+
+class _LatestGrid extends ConsumerWidget {
+  const _LatestGrid();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(latestRecipesProvider);
+    final saved = ref.watch(bookmarksProvider);
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      sliver: async.when(
+        loading: () => const ShimmerRecipeGrid(count: 4),
+        error: (e, st) => const SliverToBoxAdapter(
+            child: MessageView(message: 'Could not load recipes')),
+        data: (items) => items.isEmpty
+            ? const SliverToBoxAdapter(
+                child: MessageView(
+                    message: 'No recipes yet. Pull down to check again.',
+                    icon: Icons.menu_book_outlined))
+            : RecipeSliverGrid(
+                items: items,
+                saved: saved,
+                heroScope: 'latest',
+                onToggleSave: (id) =>
+                    ref.read(bookmarkIdsNotifierProvider.notifier).toggle(id),
               ),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: InkWell(
-                onTap: onToggleSave,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(
-                      color: Colors.white, shape: BoxShape.circle),
-                  child: Icon(
-                      saved
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
-                      size: 18,
-                      color: saved ? Colors.red : Colors.black87),
-                ),
-              ),
-            ),
-          ],
+      ),
+    );
+  }
+}
+
+/// First launch: download the catalog with a progress bar, or explain
+/// what went wrong.
+class FirstRunView extends ConsumerWidget {
+  const FirstRunView({super.key, required this.state});
+  final SyncState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final failed = state.phase == SyncPhase.failed;
+
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: failed
+                ? Column(
+                    key: const ValueKey('failed'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.wifi_off_rounded,
+                          size: 56, color: cs.onSurfaceVariant),
+                      const SizedBox(height: 16),
+                      Text('You are offline', style: text.headlineSmall),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Connect to the internet once to download the recipes. '
+                        'After that they work offline.',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      FilledButton.icon(
+                        onPressed: () => ref
+                            .read(syncControllerProvider.notifier)
+                            .retryFirstRun(),
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Try again'),
+                      ),
+                    ],
+                  )
+                : Column(
+                    key: const ValueKey('loading'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                            color: cs.primaryContainer, shape: BoxShape.circle),
+                        child: Icon(Icons.restaurant_menu_rounded,
+                            size: 40, color: cs.primary),
+                      ),
+                      const SizedBox(height: 20),
+                      Text('Setting the table', style: text.headlineSmall),
+                      const SizedBox(height: 8),
+                      Text(
+                        state.total > 0
+                            ? 'Getting recipes ready: ${state.done} of ${state.total}'
+                            : 'Getting recipes ready',
+                        style: TextStyle(color: cs.onSurfaceVariant),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: 220,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween(end: state.progress ?? 0),
+                            duration: const Duration(milliseconds: 400),
+                            builder: (_, v, __) => LinearProgressIndicator(
+                                minHeight: 6,
+                                value: state.progress == null ? null : v),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
         ),
       ),
     );

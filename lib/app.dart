@@ -9,7 +9,7 @@ class SliceOfGourmetApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final router = createRouter();
     return MaterialApp.router(
-      title: 'Slice Of Gourmet',
+      title: 'Slice of Gourmet',
       themeMode: ThemeMode.system,
       theme: lightTheme,
       darkTheme: darkTheme,
