@@ -1,3 +1,4 @@
+import '../../profile/name_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -17,8 +18,7 @@ class CategoryRecipesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(categoryRecipesProvider(categoryId));
     final saved = ref.watch(bookmarksProvider);
-    void toggle(String id) =>
-        ref.read(bookmarkIdsNotifierProvider.notifier).toggle(id);
+    void toggle(String id) => toggleSavedRecipe(context, ref, id);
 
     return Scaffold(
       body: RefreshIndicator(

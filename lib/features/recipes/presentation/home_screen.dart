@@ -7,34 +7,19 @@ import 'package:go_router/go_router.dart';
 
 import '../../recipes/providers.dart';
 import '../../recipes/data/category.dart';
-import '../../../core/auth/auth_providers.dart';
+import '../../../core/profile/display_name.dart';
+import '../../../core/profile/name_controller.dart';
 import '../../../core/data_sync/sync_controller.dart';
 import '../../../core/motion.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/recipe_card.dart';
 import '../../../core/widgets/skeletons.dart';
 import '../../../core/widgets/state_views.dart';
-import '../../auth/login_sheet.dart';
+import '../../profile/name_sheet.dart';
 import 'search_delegate.dart';
 import 'categories_screen.dart';
 import 'bookmarks_screen.dart';
 import 'settings_screen.dart';
-
-/// Opens the sign-in sheet; [onOk] runs right away when already signed in,
-/// or when sign-in is not set up on this platform.
-Future<void> requireSignIn(
-    BuildContext context, WidgetRef ref, VoidCallback onOk) async {
-  if (ref.read(isSignedInProvider) || !ref.read(signInAvailableProvider)) {
-    onOk();
-    return;
-  }
-  await showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    builder: (_) => const LoginSheet(),
-  );
-}
 
 /// Runs a rate limited refresh and tells the user how it went.
 Future<void> refreshAndReport(BuildContext context, WidgetRef ref) async {
@@ -63,13 +48,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     SettingsScreen(),
   ];
 
-  Future<void> _selectTab(int i) async {
+  void _selectTab(int i) {
     if (i == _index) return;
     HapticFeedback.selectionClick();
-    if (i != 0) {
-      await requireSignIn(context, ref, () => setState(() => _index = i));
-      return;
-    }
     setState(() => _index = i);
   }
 
@@ -98,10 +79,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    // after sign out, leave the auth-gated tabs
-    ref.listen(authControllerProvider, (prev, next) {
-      if (next == null && _index != 0) setState(() => _index = 0);
-    });
     final still = reduceMotion(context);
 
     return Scaffold(
@@ -231,22 +208,33 @@ class _PillNavItem extends StatelessWidget {
   }
 }
 
-String _greeting(DateTime now) {
-  final h = now.hour;
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
-}
-
-class _HomeTab extends ConsumerWidget {
+class _HomeTab extends ConsumerStatefulWidget {
   const _HomeTab();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends ConsumerState<_HomeTab> {
+  var _welcomeAsked = false;
+
+  void _maybeWelcome(NameState name, bool hasCatalog) {
+    if (_welcomeAsked || !hasCatalog || !name.loaded) return;
+    _welcomeAsked = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        maybeAskName(context, ref, reason: NamePromptReason.welcome);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final sync = ref.watch(syncControllerProvider);
+    final name = ref.watch(nameControllerProvider);
+    _maybeWelcome(name, sync.hasCatalog);
     if (!sync.hasCatalog) return FirstRunView(state: sync);
 
-    final user = ref.watch(authControllerProvider);
     final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
 
@@ -268,9 +256,7 @@ class _HomeTab extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            user == null
-                                ? _greeting(DateTime.now())
-                                : '${_greeting(DateTime.now())}, ${user.firstName}',
+                            homeGreeting(name.raw),
                             style: text.labelLarge
                                 ?.copyWith(color: cs.onSurfaceVariant),
                           ),
@@ -460,8 +446,7 @@ class _CategoryChips extends ConsumerWidget {
                 avatar: Icon(Icons.arrow_forward_rounded,
                     size: 18, color: cs.primary),
                 label: const Text('All'),
-                onPressed: () => requireSignIn(
-                    context, ref, () => context.push('/categories')),
+                onPressed: () => context.push('/categories'),
               ),
             );
           }
@@ -472,8 +457,7 @@ class _CategoryChips extends ConsumerWidget {
               child: ActionChip(
                 avatar: Icon(categoryIcon(c.name), size: 18, color: cs.primary),
                 label: Text(c.name),
-                onPressed: () =>
-                    requireSignIn(context, ref, () => openCategory(context, c)),
+                onPressed: () => openCategory(context, c),
               ),
             ),
           );
@@ -547,9 +531,8 @@ class _TrendingCarouselState extends ConsumerState<_TrendingCarousel> {
                         recipe: r,
                         heroScope: 'trending',
                         saved: saved.contains(r.id),
-                        onToggleSave: () => ref
-                            .read(bookmarkIdsNotifierProvider.notifier)
-                            .toggle(r.id),
+                        onToggleSave: () =>
+                            toggleSavedRecipe(context, ref, r.id),
                       ),
                     ),
                   ),
@@ -618,8 +601,7 @@ class _LatestGrid extends ConsumerWidget {
                 items: items,
                 saved: saved,
                 heroScope: 'latest',
-                onToggleSave: (id) =>
-                    ref.read(bookmarkIdsNotifierProvider.notifier).toggle(id),
+                onToggleSave: (id) => toggleSavedRecipe(context, ref, id),
               ),
       ),
     );

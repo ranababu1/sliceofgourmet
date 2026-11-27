@@ -7,7 +7,7 @@ Recipe app for [sliceofgourmet.com](https://sliceofgourmet.com), built with Flut
 - Every recipe from the site, cached on the device and usable offline
 - Search, categories, saved recipes and a clean step by step recipe view
 - Light and dark themes, subtle motion that respects the system reduce motion setting
-- Optional Google sign-in
+- Optional first name, used only to greet you, stored on the device
 
 ## How data loads
 

@@ -1,43 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/analytics/consent.dart';
-import '../../../core/auth/auth_providers.dart';
 import 'package:intl/intl.dart';
+
 import '../../../core/data_sync/sync_controller.dart';
-import 'home_screen.dart' show refreshAndReport;
 import '../../../core/privacy.dart';
-import '../../../core/widgets/network_image.dart';
+import '../../../core/profile/name_controller.dart';
+import '../../../core/theme.dart';
+import '../../profile/name_sheet.dart';
+import 'home_screen.dart' show refreshAndReport;
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
-  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
+  Future<void> _clearName(BuildContext context, WidgetRef ref) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Sign out?'),
+        title: const Text('Clear your name?'),
+        content: const Text(
+            'We\'ll stop greeting you by name. Your saved recipes stay on this device.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: const Text('Cancel')),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Sign out')),
+              child: const Text('Clear name')),
         ],
       ),
     );
-    if (ok != true) return;
-    await ref.read(authControllerProvider.notifier).signOut();
-    messenger.showSnackBar(const SnackBar(content: Text('Signed out')));
+    if (ok == true) {
+      await ref.read(nameControllerProvider.notifier).clear();
+    }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sync = ref.watch(syncControllerProvider);
     final last = sync.lastSyncedAt;
-    final user = ref.watch(authControllerProvider);
-    final consent = ref.watch(analyticsConsentProvider);
+    final name = ref.watch(nameControllerProvider);
+    final first = name.firstName;
+    final cs = Theme.of(context).colorScheme;
 
     return SafeArea(
       bottom: false,
@@ -49,41 +52,77 @@ class SettingsScreen extends ConsumerWidget {
             child: Text('Profile',
                 style: Theme.of(context).textTheme.headlineMedium),
           ),
-          if (user != null) ...[
-            const _SectionHeader('Account'),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Material(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(20),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor: Brand.herbSoft,
+                      foregroundColor: Brand.herb,
+                      child: Text(
+                        first == null ? '?' : first[0],
+                        style: display(22, color: Brand.herb),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            first == null ? 'Hi there' : 'Hi, $first',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            first == null
+                                ? 'Add a name so we can greet you'
+                                : 'Your name stays on this device',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (first == null)
             ListTile(
-              leading: (user.photoUrl ?? '').isNotEmpty
-                  ? ClipOval(
-                      child: SizedBox(
-                          width: 40,
-                          height: 40,
-                          child: AppNetworkImage(url: user.photoUrl!)))
-                  : CircleAvatar(
-                      child: Text(user.firstName.isNotEmpty
-                          ? user.firstName[0].toUpperCase()
-                          : '?')),
-              title: Text(user.displayName),
-              subtitle: Text(user.email),
+              key: const Key('addNameTile'),
+              leading: const Icon(Icons.badge_outlined),
+              title: const Text('Add your name'),
+              onTap: () =>
+                  maybeAskName(context, ref, reason: NamePromptReason.edit),
+            )
+          else ...[
+            ListTile(
+              key: const Key('editNameTile'),
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Edit name'),
+              subtitle: Text(name.raw.trim()),
+              onTap: () =>
+                  maybeAskName(context, ref, reason: NamePromptReason.edit),
             ),
             ListTile(
-              key: const Key('signOutTile'),
-              leading: const Icon(Icons.logout_rounded),
-              title: const Text('Sign out'),
-              onTap: () => _signOut(context, ref),
+              key: const Key('clearNameTile'),
+              leading: const Icon(Icons.person_off_outlined),
+              title: const Text('Clear name'),
+              onTap: () => _clearName(context, ref),
             ),
-            const Divider(),
           ],
+          const Divider(),
           const _SectionHeader('Privacy'),
-          if (ref.watch(signInAvailableProvider))
-            SwitchListTile(
-              secondary: const Icon(Icons.analytics_outlined),
-              title: const Text('Share signup info'),
-              subtitle: const Text(
-                  'Send my name, email and device model to Slice of Gourmet when I sign up'),
-              value: consent,
-              onChanged: (v) =>
-                  ref.read(analyticsConsentProvider.notifier).set(v),
-            ),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
             title: const Text('Privacy policy'),
