@@ -1,7 +1,7 @@
 # Releasing Slice of Gourmet
 
 Package / bundle ID: `dev.imrn.sliceofgourmet`. Version lives in `pubspec.yaml` as `name+build`
-(now `1.2.0+3`). Bump the build number for every store upload.
+(now `1.2.1+4`). Bump the build number for every store upload.
 
 ## 1. Android
 
@@ -34,11 +34,11 @@ INTERNET permission, app name "Slice of Gourmet", adaptive icon, backups off.
 3. App content:
    - Privacy policy URL (required, see section 4).
    - Ads: no. Target audience: 13+ (or 18+). Content rating questionnaire.
-   - Data safety:
-     - No data collected without sign-in.
-     - With Google sign-in and the optional consent box ticked: Name, Email address and Device
-       model are collected for Analytics, sent over HTTPS, not shared, not sold.
-     - Users can turn the consent off in Profile. Say how they can ask for deletion (email).
+   - Data safety: Data is not collected.
+     The app has no account and no analytics or ads. A first name, if the user types one, and
+     their saved recipes are stored only on the device. Nothing personal is sent to you, to
+     Google, or to the website. The app only downloads public recipes and images from
+     sliceofgourmet.com.
 4. App links (optional): to open shared recipe links in the app, put
    `https://sliceofgourmet.com/.well-known/assetlinks.json` on the site with the SHA-256 of the
    Play app signing key (Play Console > Setup > App signing shows a ready made file).
@@ -57,9 +57,11 @@ INTERNET permission, app name "Slice of Gourmet", adaptive icon, backups off.
    - Listing: name, subtitle, description, keywords, support URL, 6.9 inch and 6.5 inch iPhone
      screenshots (and iPad if you keep iPad support).
    - Privacy policy URL (required).
-   - App Privacy labels: Name and Email Address, linked to the user, used for Analytics, not
-     used for tracking, only when the user signs in and opts in. Otherwise "Data not collected".
-   - Review notes: sign-in is optional. See section 3 for guideline 4.8.
+   - App Privacy labels: Data not collected.
+     A first name and saved recipes stay in on-device storage (UserDefaults / app files) and
+     never leave the phone. Declare UserDefaults (CA92.1) and file timestamps (C617.1) in
+     PrivacyInfo.xcprivacy; that file is already in the project.
+   - Review notes: there is no sign-in and no account. Guideline 4.8 does not apply.
 6. Universal links (optional): put `https://sliceofgourmet.com/.well-known/apple-app-site-association`
    on the site:
    `{"applinks":{"details":[{"appIDs":["TEAMID.dev.imrn.sliceofgourmet"],"components":[{"/":"/*/*/"}]}]}}`
@@ -67,53 +69,26 @@ INTERNET permission, app name "Slice of Gourmet", adaptive icon, backups off.
 7. Later: Flutter now generates new iOS apps with the UIScene lifecycle. Apple will require it in a
    future SDK. Migrate when that is announced (AppDelegate + SceneDelegate, see Flutter docs).
 
-## 3. Google sign-in (do this yourself, nothing was created)
+## 3. No account
 
-The code is ready and fails safely: on iOS, sign-in is hidden and nothing is gated until a client
-ID is supplied. On Android a missing OAuth client shows "Google sign-in is not available right now
-(configuration error)" instead of crashing.
+The app does not use Google sign-in, Sign in with Apple, or any other account. Every tab is
+open to everyone. The user can type a first name (skippable) so the home screen can say
+"Hi, {name}". That name and their shortlist stay on the device in SharedPreferences / Hive.
 
-In Google Cloud Console (APIs & Services > Credentials), in one project:
-
-1. OAuth consent screen: app name, support email, the privacy policy URL, scopes `email`,
-   `profile`, `openid`. Publish it (In production) so any Google account can sign in.
-2. Android OAuth clients, package `dev.imrn.sliceofgourmet`, one per SHA-1:
-   - Debug: `keytool -list -v -alias androiddebugkey -keystore ~/.android/debug.keystore -storepass android`
-   - Upload: `keytool -list -v -alias upload -keystore ~/keys/sliceofgourmet-upload.jks`
-   - Play app signing: Play Console > Setup > App signing > App signing key certificate SHA-1.
-     This is the one real users hit; without it sign-in fails for Play installs.
-3. iOS OAuth client, bundle ID `dev.imrn.sliceofgourmet`. Note the client ID and its iOS URL scheme
-   (the reversed client ID).
-4. Wire the iOS client in:
-   - Copy `ios/Flutter/GoogleSignIn.xcconfig.example` to `ios/Flutter/GoogleSignIn.xcconfig` and set
-     `GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.XXXX`. This becomes the URL scheme
-     in Info.plist.
-   - Build with `--dart-define=GOOGLE_IOS_CLIENT_ID=XXXX.apps.googleusercontent.com`. The app passes
-     it to the SDK as the client ID (no GIDClientID or GoogleService-Info.plist needed).
-5. No google-services.json or GoogleService-Info.plist is needed. There is no Firebase and no
-   backend token check, so no web client ID is needed either.
-
-App Store guideline 4.8: an app that offers Google sign-in must also offer Sign in with Apple (or
-another login that meets 4.8). Pick one before submitting to Apple:
-
-- Recommended: ship iOS without Google sign-in (just do not pass `GOOGLE_IOS_CLIENT_ID`). Every
-  feature then works without an account, which also avoids guideline 5.1.1 issues about forcing
-  sign-in. Add Google plus Sign in with Apple together in a later version.
-- Or add Sign in with Apple now (package `sign_in_with_apple`, the capability in Xcode) next to
-  Google.
+Do not create OAuth clients or add google-services.json / GoogleService-Info.plist for this
+version.
 
 ## 4. Privacy policy (blocking)
 
-The site has no privacy policy page yet, and both stores require one. The app links to
+The site has no privacy policy page yet, and both stores still require a URL even when no
+personal data is collected. The app links to
 `https://sliceofgourmet.com/privacy-policy/` (`kPrivacyPolicyUrl` in `lib/core/constants.dart`).
-Publish a page at that address (WordPress > Settings > Privacy can generate a draft) covering:
-the app, optional Google sign-in, the name, email and device model sent to the signup sheet,
-how to ask for deletion, and a contact email.
+Publish a page at that address covering: the app has no account; a name and saved recipes stay
+on the device and are not sent anywhere; the app downloads public recipes and images from the
+site; and a contact email.
 
 ## 5. Optional build settings
 
-- `--dart-define=SHEETS_WEBHOOK_URL=...` and `SHEETS_WEBHOOK_SECRET=...` turn on the opt in signup
-  log. Without them nothing is sent.
 - `--dart-define=SOG_BASE_URL=...` points the app at another copy of the site (staging, tests).
 
 ## 6. Scalability: keeping load off WordPress

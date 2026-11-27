@@ -1,5 +1,0 @@
-// Copy to ios/Flutter/GoogleSignIn.xcconfig (gitignored) once the iOS OAuth
-// client exists. Use the "iOS URL scheme" shown for that client, which is the
-// client ID reversed: 1234-abcd.apps.googleusercontent.com becomes
-// com.googleusercontent.apps.1234-abcd
-GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.REPLACE_ME

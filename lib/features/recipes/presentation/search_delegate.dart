@@ -1,3 +1,4 @@
+import '../../profile/name_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // use a package import plus alias so the provider symbol always resolves
@@ -58,8 +59,7 @@ class RecipeSearchDelegate extends SearchDelegate<String?> {
                 items: items,
                 saved: saved,
                 heroScope: 'search',
-                onToggleSave: (id) =>
-                    ref.read(p.bookmarkIdsNotifierProvider.notifier).toggle(id),
+                onToggleSave: (id) => toggleSavedRecipe(context, ref, id),
               ),
             ),
           ]);

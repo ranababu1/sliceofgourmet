@@ -1,3 +1,4 @@
+import '../../profile/name_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -13,8 +14,7 @@ class BookmarksScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncItems = ref.watch(bookmarkedRecipesProvider);
     final bookmarks = ref.watch(bookmarksProvider);
-    void toggle(String id) =>
-        ref.read(bookmarkIdsNotifierProvider.notifier).toggle(id);
+    void toggle(String id) => toggleSavedRecipe(context, ref, id);
 
     List<Widget> body() {
       if (bookmarks.isEmpty) {

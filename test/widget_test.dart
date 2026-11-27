@@ -7,10 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sliceofgourmet/app.dart';
-import 'package:sliceofgourmet/core/auth/auth_providers.dart';
 import 'package:sliceofgourmet/core/cache/local_store.dart';
 import 'package:sliceofgourmet/core/data_sync/recipe_sync.dart';
 import 'package:sliceofgourmet/core/data_sync/sync_controller.dart';
+import 'package:sliceofgourmet/core/profile/name_controller.dart';
 import 'package:sliceofgourmet/features/recipes/data/wordpress_api.dart';
 import 'package:sliceofgourmet/features/recipes/providers.dart';
 
@@ -34,15 +34,19 @@ class FakeSync extends RecipeSync {
   }
 }
 
-Widget _app(FakeSync sync, {bool signIn = true}) => ProviderScope(
+Widget _app(FakeSync sync) => ProviderScope(
       overrides: [
         recipeRepositoryProvider.overrideWithValue(FakeRecipeRepository()),
-        authRepositoryProvider
-            .overrideWithValue(FakeAuthRepository(isAvailable: signIn)),
         recipeSyncProvider.overrideWithValue(sync),
       ],
       child: const SliceOfGourmetApp(),
     );
+
+Future<void> _pumpHome(WidgetTester tester, {FakeSync? sync}) async {
+  await tester.pumpWidget(_app(sync ?? FakeSync(LocalStore.instance)));
+  await tester.pump();
+  await tester.pumpAndSettle();
+}
 
 void main() {
   setUpAll(() async {
@@ -51,7 +55,8 @@ void main() {
   });
 
   setUp(() async {
-    SharedPreferences.setMockInitialValues({});
+    // Skip the one-time welcome prompt unless a test wants it.
+    SharedPreferences.setMockInitialValues({kNamePromptShownKey: true});
     await LocalStore.instance.clear();
   });
 
@@ -59,12 +64,11 @@ void main() {
     await LocalStore.instance.setCatalogIds(['0', '1', '2']);
     await LocalStore.instance.setLastSyncedAt(DateTime.now());
     final sync = FakeSync(LocalStore.instance);
-    await tester.pumpWidget(_app(sync));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 600));
+    await _pumpHome(tester, sync: sync);
 
     expect(find.byType(MaterialApp), findsOneWidget);
     expect(find.text('What are we\ncooking today?'), findsOneWidget);
+    expect(find.text('Hi there'), findsOneWidget);
     expect(find.text('Fake Recipe 0'), findsWidgets);
     expect(find.byTooltip('Refresh recipes'), findsOneWidget);
     expect(sync.calls, 0, reason: 'synced recently, nothing to do');
@@ -109,28 +113,100 @@ void main() {
     expect(find.text('Fake Recipe 0'), findsWidgets);
   });
 
-  testWidgets('tabs other than Home ask for sign-in', (tester) async {
+  testWidgets('tabs open without an account', (tester) async {
     await LocalStore.instance.setCatalogIds(['0']);
     await LocalStore.instance.setLastSyncedAt(DateTime.now());
-    await tester.pumpWidget(_app(FakeSync(LocalStore.instance)));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 600));
+    await _pumpHome(tester);
     await tester.tap(find.bySemanticsLabel('Saved'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('Continue with Google'), findsOneWidget);
-  });
-
-  testWidgets('without sign-in configured, tabs open directly', (tester) async {
-    await LocalStore.instance.setCatalogIds(['0']);
-    await LocalStore.instance.setLastSyncedAt(DateTime.now());
-    await tester.pumpWidget(_app(FakeSync(LocalStore.instance), signIn: false));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('Saved'), findsWidgets);
     await tester.tap(find.bySemanticsLabel('Profile'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
-    expect(find.text('Continue with Google'), findsNothing);
     expect(find.text('Refresh recipes'), findsOneWidget);
+    expect(find.text('Add your name'), findsOneWidget);
+  });
+
+  testWidgets('welcome prompt can save a name used in the greeting',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await LocalStore.instance.setCatalogIds(['0']);
+    await LocalStore.instance.setLastSyncedAt(DateTime.now());
+    await _pumpHome(tester);
+    expect(find.text('What should we call you?'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('nameField')), 'imran khan');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(find.text('Hi, Imran'), findsOneWidget);
+    expect(find.text('What should we call you?'), findsNothing);
+  });
+
+  testWidgets('welcome prompt is skippable and falls back to Hi there',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await LocalStore.instance.setCatalogIds(['0']);
+    await LocalStore.instance.setLastSyncedAt(DateTime.now());
+    await _pumpHome(tester);
+    expect(find.text('What should we call you?'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('skipNameButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Hi there'), findsOneWidget);
+    expect(find.text('What should we call you?'), findsNothing);
+  });
+
+  testWidgets('saving a recipe without a name asks gently, then still saves',
+      (tester) async {
+    await LocalStore.instance.setCatalogIds(['0', '1', '2']);
+    await LocalStore.instance.setLastSyncedAt(DateTime.now());
+    await _pumpHome(tester);
+    expect(find.text('Want to add your name?'), findsNothing);
+
+    await tester.tap(find.bySemanticsLabel('Save recipe').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Want to add your name?'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('skipNameButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Want to add your name?'), findsNothing);
+
+    await tester.tap(find.bySemanticsLabel('Saved'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('Fake Recipe 0'), findsWidgets);
+  });
+
+  testWidgets('profile can edit and clear the name', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      kNamePromptShownKey: true,
+      kDisplayNameKey: 'Sammy',
+    });
+    await LocalStore.instance.setCatalogIds(['0']);
+    await LocalStore.instance.setLastSyncedAt(DateTime.now());
+    await _pumpHome(tester);
+    expect(find.text('Hi, Sammy'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Profile'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('Edit name'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('editNameTile')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('nameField')), 'imran');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(find.text('Hi, Imran'), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('clearNameTile')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Clear name').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Add your name'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Home'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('Hi there'), findsOneWidget);
   });
 }

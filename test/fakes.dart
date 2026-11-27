@@ -1,5 +1,3 @@
-import 'package:sliceofgourmet/core/auth/app_user.dart';
-import 'package:sliceofgourmet/core/auth/auth_repository.dart';
 import 'package:sliceofgourmet/features/recipes/data/category.dart';
 import 'package:sliceofgourmet/features/recipes/data/recipe.dart';
 import 'package:sliceofgourmet/features/recipes/data/recipe_repository.dart';
@@ -56,21 +54,4 @@ class FakeRecipeRepository implements RecipeRepository {
       link.path.contains('fake-recipe-')
           ? link.pathSegments.where((s) => s.isNotEmpty).last.split('-').last
           : null;
-}
-
-class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository({this.user, this.isAvailable = true});
-  AppUser? user;
-
-  @override
-  final bool isAvailable;
-
-  @override
-  Future<AppUser?> getCurrentUser() async => user;
-
-  @override
-  Future<AppUser?> signInWithGoogle() async => user;
-
-  @override
-  Future<void> signOut() async => user = null;
 }

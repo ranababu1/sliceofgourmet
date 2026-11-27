@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/recipe.dart';
 import '../data/wordpress_api.dart' show RecipeNotFoundException;
 import '../providers.dart';
+import '../../profile/name_sheet.dart';
 import '../../../core/motion.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/recipe_card.dart';
@@ -189,7 +190,7 @@ class _RecipeDetailBodyState extends ConsumerState<_RecipeDetailBody> {
           filledBackground: hasPhoto,
           onPressed: () {
             HapticFeedback.lightImpact();
-            ref.read(bookmarkIdsNotifierProvider.notifier).toggle(recipe.id);
+            toggleSavedRecipe(context, ref, recipe.id);
           },
         ),
       ),
