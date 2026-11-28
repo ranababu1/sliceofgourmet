@@ -9,12 +9,17 @@ plugins {
 }
 
 // Release signing. Create android/key.properties (gitignored), see RELEASE.md.
-// Without it, release builds fall back to the debug key so CI and local builds still work.
+// A release build without it fails instead of signing with the debug key, which Play rejects.
+// Debug and profile builds do not need it.
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 val hasReleaseKey = keystorePropertiesFile.exists()
 if (hasReleaseKey) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+val isReleaseBuild = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
+if (isReleaseBuild && !hasReleaseKey) {
+    throw GradleException("Release signing is not set up: android/key.properties is missing. See RELEASE.md.")
 }
 
 android {
@@ -54,11 +59,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (hasReleaseKey) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
